@@ -3,25 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="description" content="Research-grade LLM introspection with intuitive interface">
-    <title>LLM Research Explorer</title>
+    <meta name="description" content="Research-grade LLM analysis using real probability data">
+    <title>LLM Research Interface - Scientific</title>
     
     <style>
         :root {
-            --bg-primary: #0f0f1a;
-            --bg-secondary: rgba(15, 15, 25, 0.95);
-            --bg-card: rgba(25, 25, 35, 0.9);
-            --border-primary: rgba(120, 180, 255, 0.3);
-            --border-accent: rgba(255, 150, 80, 0.4);
-            --text-primary: #f0f0f0;
-            --text-secondary: #b0b0b0;
-            --text-accent: #88ccff;
-            --text-highlight: #ffaa66;
-            --success: #66dd88;
-            --warning: #ffcc66;
-            --error: #ff6b88;
+            --bg-primary: #0a0b0f;
+            --bg-secondary: rgba(10, 15, 25, 0.95);
+            --bg-card: rgba(15, 20, 30, 0.9);
+            --border-primary: rgba(100, 150, 255, 0.3);
+            --border-accent: rgba(255, 140, 70, 0.4);
+            --text-primary: #f0f2f5;
+            --text-secondary: #a8adb8;
+            --text-accent: #7bb3ff;
+            --text-highlight: #ff9f5a;
+            --success: #5fb85f;
+            --warning: #e6b84f;
+            --error: #e65555;
+            --uncertainty-high: #ff6b6b;
+            --uncertainty-med: #ffa500;
+            --uncertainty-low: #4ecdc4;
             --font-primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-            --font-mono: 'SF Mono', 'Monaco', 'Menlo', monospace;
+            --font-mono: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
         }
 
         * {
@@ -37,72 +40,92 @@
             overflow: hidden;
             height: 100vh;
             touch-action: manipulation;
-            -webkit-text-size-adjust: 100%;
         }
 
-        #container {
+        .app-container {
             width: 100vw;
             height: 100vh;
             display: grid;
             grid-template-areas: 
-                "main-header main-header"
-                "visualization controls"
-                "results results";
+                "header header header"
+                "controls visualization results"
+                "status status status";
             grid-template-rows: auto 1fr auto;
-            grid-template-columns: 1fr 300px;
-            gap: 10px;
-            padding: 10px;
+            grid-template-columns: 300px 1fr 350px;
+            gap: 8px;
+            padding: 8px;
         }
 
-        /* Mobile layout */
-        @media (max-width: 768px) {
-            #container {
+        @media (max-width: 1024px) {
+            .app-container {
                 grid-template-areas: 
-                    "main-header"
-                    "controls"
+                    "header"
+                    "controls" 
                     "visualization"
-                    "results";
+                    "results"
+                    "status";
                 grid-template-columns: 1fr;
-                grid-template-rows: auto auto 1fr auto;
-                padding: 5px;
-                gap: 5px;
+                grid-template-rows: auto auto 300px auto auto;
             }
         }
 
-        /* Main Header - Model Status & Quick Actions */
-        .main-header {
-            grid-area: main-header;
+        /* Header */
+        .header {
+            grid-area: header;
             background: var(--bg-card);
             border: 1px solid var(--border-primary);
-            border-radius: 12px;
+            border-radius: 8px;
             padding: 16px;
             display: flex;
             align-items: center;
-            gap: 16px;
-            backdrop-filter: blur(20px);
+            justify-content: space-between;
+            backdrop-filter: blur(10px);
+        }
+
+        .app-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .app-title h1 {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .research-badge {
+            background: var(--text-accent);
+            color: var(--bg-primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .model-status {
             display: flex;
             align-items: center;
-            gap: 12px;
-            flex: 1;
+            gap: 8px;
+            font-size: 13px;
         }
 
-        .status-dot {
-            width: 12px;
-            height: 12px;
+        .status-indicator {
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background: var(--error);
             transition: background 0.3s ease;
         }
 
-        .status-dot.loading {
+        .status-indicator.loading {
             background: var(--warning);
             animation: pulse 1.5s infinite;
         }
 
-        .status-dot.ready {
+        .status-indicator.ready {
             background: var(--success);
         }
 
@@ -111,115 +134,12 @@
             50% { opacity: 0.4; }
         }
 
-        .model-info h2 {
-            font-size: 16px;
-            font-weight: 600;
-            margin-bottom: 2px;
-        }
-
-        .model-info p {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin: 0;
-        }
-
-        .quick-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .btn {
-            padding: 10px 16px;
-            border: 1px solid var(--border-primary);
-            border-radius: 8px;
-            background: transparent;
-            color: var(--text-primary);
-            font-family: inherit;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            min-height: 40px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .btn:hover:not(:disabled) {
-            background: rgba(120, 180, 255, 0.1);
-            border-color: var(--border-accent);
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .btn.primary {
-            background: var(--text-accent);
-            color: var(--bg-primary);
-            border-color: var(--text-accent);
-        }
-
-        .btn.primary:hover:not(:disabled) {
-            background: #66aaee;
-        }
-
-        /* Visualization Area */
-        .visualization-area {
-            grid-area: visualization;
-            background: var(--bg-card);
-            border: 1px solid var(--border-primary);
-            border-radius: 12px;
-            position: relative;
-            overflow: hidden;
-            min-height: 400px;
-        }
-
-        #babylonCanvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-            touch-action: none;
-        }
-
-        .viz-overlay {
-            position: absolute;
-            top: 16px;
-            left: 16px;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            border-radius: 8px;
-            padding: 12px;
-            font-size: 11px;
-            font-family: var(--font-mono);
-            color: var(--text-secondary);
-            pointer-events: none;
-        }
-
-        .viz-help {
-            position: absolute;
-            bottom: 16px;
-            left: 16px;
-            right: 16px;
-            text-align: center;
-            color: var(--text-secondary);
-            font-size: 11px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            pointer-events: none;
-        }
-
-        .visualization-area:hover .viz-help {
-            opacity: 1;
-        }
-
-        /* Control Panel */
-        .control-panel {
+        /* Controls Panel */
+        .controls-panel {
             grid-area: controls;
             background: var(--bg-card);
             border: 1px solid var(--border-primary);
-            border-radius: 12px;
+            border-radius: 8px;
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -228,7 +148,7 @@
         .panel-header {
             padding: 16px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(0, 0, 0, 0.3);
         }
 
         .panel-header h3 {
@@ -250,11 +170,13 @@
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
 
         .form-label {
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 6px;
             font-size: 12px;
             font-weight: 500;
             color: var(--text-secondary);
@@ -263,12 +185,42 @@
             letter-spacing: 0.5px;
         }
 
+        .help-icon {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+            color: var(--bg-primary);
+            font-size: 10px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 14px;
+            cursor: help;
+            position: relative;
+        }
+
+        .help-icon:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 120%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
         .form-input {
             width: 100%;
-            padding: 10px 12px;
+            padding: 8px 12px;
             border: 1px solid var(--border-primary);
             border-radius: 6px;
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0.4);
             color: var(--text-primary);
             font-family: inherit;
             font-size: 13px;
@@ -278,7 +230,7 @@
         .form-input:focus {
             outline: none;
             border-color: var(--text-accent);
-            box-shadow: 0 0 0 2px rgba(136, 204, 255, 0.2);
+            box-shadow: 0 0 0 2px rgba(123, 179, 255, 0.2);
         }
 
         .form-textarea {
@@ -291,13 +243,13 @@
         .slider-group {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
 
         .slider {
             flex: 1;
-            height: 6px;
-            border-radius: 3px;
+            height: 4px;
+            border-radius: 2px;
             background: rgba(255, 255, 255, 0.1);
             outline: none;
             -webkit-appearance: none;
@@ -313,21 +265,100 @@
             border: 2px solid var(--bg-primary);
         }
 
-        .slider::-moz-range-thumb {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--text-accent);
-            cursor: pointer;
-            border: 2px solid var(--bg-primary);
-        }
-
         .slider-value {
-            min-width: 40px;
+            min-width: 35px;
             text-align: center;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             color: var(--text-accent);
+        }
+
+        .btn {
+            padding: 8px 12px;
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            justify-content: center;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: rgba(123, 179, 255, 0.1);
+            border-color: var(--text-accent);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn.primary {
+            background: var(--text-accent);
+            color: var(--bg-primary);
+            border-color: var(--text-accent);
+        }
+
+        .btn.warning {
+            background: var(--warning);
+            color: var(--bg-primary);
+            border-color: var(--warning);
+        }
+
+        /* Visualization Area */
+        .visualization-area {
+            grid-area: visualization;
+            background: var(--bg-card);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            min-height: 300px;
+        }
+
+        #probabilityCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: linear-gradient(135deg, rgba(10, 15, 30, 1) 0%, rgba(5, 10, 20, 1) 100%);
+        }
+
+        .viz-overlay {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 6px;
+            padding: 8px 10px;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+            pointer-events: none;
+        }
+
+        .viz-help {
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            right: 12px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 10px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .visualization-area:hover .viz-help {
+            opacity: 1;
         }
 
         /* Results Panel */
@@ -335,10 +366,10 @@
             grid-area: results;
             background: var(--bg-card);
             border: 1px solid var(--border-primary);
-            border-radius: 12px;
+            border-radius: 8px;
             display: flex;
             flex-direction: column;
-            max-height: 200px;
+            overflow: hidden;
         }
 
         .results-tabs {
@@ -348,12 +379,12 @@
 
         .tab {
             flex: 1;
-            padding: 12px 16px;
+            padding: 10px 12px;
             background: none;
             border: none;
             color: var(--text-secondary);
             font-family: inherit;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -363,18 +394,12 @@
 
         .tab.active {
             color: var(--text-accent);
-            background: rgba(136, 204, 255, 0.1);
-            border-bottom: 2px solid var(--text-accent);
-        }
-
-        .tab:hover:not(.active) {
-            color: var(--text-primary);
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(123, 179, 255, 0.1);
         }
 
         .tab-content {
             flex: 1;
-            padding: 16px;
+            padding: 12px;
             overflow-y: auto;
             display: none;
         }
@@ -385,28 +410,44 @@
 
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 12px;
-            margin-bottom: 16px;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 12px;
         }
 
         .metric-card {
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0.4);
             border-radius: 6px;
-            padding: 12px;
+            padding: 10px;
             text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .metric-value {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 700;
-            color: var(--text-accent);
             margin-bottom: 4px;
         }
 
         .metric-label {
-            font-size: 10px;
+            font-size: 9px;
             color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .uncertainty-high .metric-value { color: var(--uncertainty-high); }
+        .uncertainty-med .metric-value { color: var(--uncertainty-med); }
+        .uncertainty-low .metric-value { color: var(--uncertainty-low); }
+
+        .token-sequence {
+            margin-bottom: 12px;
+        }
+
+        .sequence-header {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -414,32 +455,38 @@
         .token-stream {
             display: flex;
             flex-wrap: wrap;
-            gap: 4px;
-            margin-bottom: 12px;
+            gap: 3px;
+            margin-bottom: 8px;
         }
 
         .token {
-            padding: 4px 8px;
-            border-radius: 4px;
+            padding: 3px 6px;
+            border-radius: 3px;
             font-family: var(--font-mono);
             font-size: 11px;
-            background: rgba(136, 204, 255, 0.1);
+            background: rgba(123, 179, 255, 0.1);
             color: var(--text-accent);
-            border: 1px solid rgba(136, 204, 255, 0.2);
-            position: relative;
+            border: 1px solid rgba(123, 179, 255, 0.2);
             cursor: pointer;
             transition: all 0.2s ease;
+            position: relative;
         }
 
         .token:hover {
-            background: rgba(136, 204, 255, 0.2);
+            background: rgba(123, 179, 255, 0.2);
             transform: translateY(-1px);
         }
 
-        .token.uncertain {
-            background: rgba(255, 204, 102, 0.1);
-            color: var(--warning);
-            border-color: rgba(255, 204, 102, 0.3);
+        .token.high-uncertainty {
+            background: rgba(255, 107, 107, 0.1);
+            color: var(--uncertainty-high);
+            border-color: rgba(255, 107, 107, 0.3);
+        }
+
+        .token.medium-uncertainty {
+            background: rgba(255, 165, 0, 0.1);
+            color: var(--uncertainty-med);
+            border-color: rgba(255, 165, 0, 0.3);
         }
 
         .token.current {
@@ -448,61 +495,78 @@
             font-weight: 600;
         }
 
-        .generation-output {
-            background: rgba(0, 0, 0, 0.4);
-            border-radius: 6px;
-            padding: 12px;
+        .probability-details {
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 4px;
+            padding: 8px;
             font-family: var(--font-mono);
-            font-size: 13px;
-            line-height: 1.5;
-            min-height: 60px;
-            color: var(--text-primary);
-        }
-
-        .comparison-view {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-
-        .comparison-item {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 6px;
-            padding: 12px;
-        }
-
-        .comparison-item h4 {
-            font-size: 11px;
-            color: var(--text-secondary);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-        }
-
-        .comparison-item .output {
-            font-family: var(--font-mono);
-            font-size: 12px;
+            font-size: 10px;
             line-height: 1.4;
-            margin-bottom: 8px;
         }
 
-        .comparison-metrics {
+        .alternative-tokens {
+            margin-top: 8px;
+        }
+
+        .alternative-token {
             display: flex;
-            gap: 12px;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2px 4px;
+            margin-bottom: 2px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 2px;
             font-size: 10px;
         }
 
-        .comparison-metrics span {
-            color: var(--text-accent);
+        .alternative-token-text {
+            font-family: var(--font-mono);
+            color: var(--text-primary);
         }
 
-        /* Loading States */
+        .alternative-token-prob {
+            color: var(--text-accent);
+            font-weight: 600;
+        }
+
+        /* Status Bar */
+        .status-bar {
+            grid-area: status;
+            background: var(--bg-card);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .experiment-info {
+            display: flex;
+            gap: 16px;
+        }
+
+        .experiment-info span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .export-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* Loading Screen */
         .loading-screen {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(15, 15, 26, 0.95);
+            background: rgba(10, 11, 15, 0.95);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -512,13 +576,13 @@
         }
 
         .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 2px solid rgba(136, 204, 255, 0.2);
+            width: 32px;
+            height: 32px;
+            border: 2px solid rgba(123, 179, 255, 0.2);
             border-top: 2px solid var(--text-accent);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
 
         @keyframes spin {
@@ -527,59 +591,60 @@
         }
 
         .loading-text {
-            color: var(--text-secondary);
+            color: var(--text-primary);
             font-size: 14px;
-            text-align: center;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .loading-details {
             color: var(--text-secondary);
             font-size: 11px;
-            opacity: 0.7;
+            text-align: center;
+            max-width: 300px;
         }
 
-        /* Mobile Optimizations */
-        @media (max-width: 768px) {
-            .main-header {
-                padding: 12px;
-                flex-direction: column;
-                align-items: stretch;
-                gap: 12px;
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .controls-panel, .results-panel {
+                max-height: none;
             }
-
-            .model-status {
-                justify-content: center;
-            }
-
-            .quick-actions {
-                justify-content: center;
-                flex-wrap: wrap;
-            }
-
-            .control-panel {
-                max-height: 300px;
-            }
-
-            .results-panel {
-                max-height: 250px;
-            }
-
-            .btn {
-                padding: 8px 12px;
-                font-size: 12px;
-            }
-
-            .comparison-view {
-                grid-template-columns: 1fr;
-            }
-
+            
             .metrics-grid {
-                grid-template-columns: repeat(3, 1fr);
+                grid-template-columns: repeat(4, 1fr);
+            }
+            
+            .experiment-info {
+                flex-direction: column;
+                gap: 4px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .app-container {
+                padding: 4px;
+                gap: 4px;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 8px;
+                align-items: stretch;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
             }
         }
 
         /* Accessibility */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
         .sr-only {
             position: absolute;
             width: 1px;
@@ -591,349 +656,442 @@
             white-space: nowrap;
             border: 0;
         }
-
-        @media (prefers-reduced-motion: reduce) {
-            * {
-                animation-duration: 0.01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: 0.01ms !important;
-            }
-        }
-
-        /* High contrast mode */
-        @media (prefers-contrast: high) {
-            :root {
-                --bg-primary: #000000;
-                --bg-card: #1a1a1a;
-                --border-primary: #ffffff;
-                --text-primary: #ffffff;
-            }
-        }
-
-        /* Tooltips */
-        .tooltip {
-            position: relative;
-            cursor: help;
-        }
-
-        .tooltip::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 6px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            white-space: nowrap;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s ease;
-            z-index: 1000;
-        }
-
-        .tooltip:hover::after {
-            opacity: 1;
-        }
-
-        .help-icon {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: var(--text-secondary);
-            color: var(--bg-primary);
-            font-size: 10px;
-            font-weight: bold;
-            text-align: center;
-            line-height: 14px;
-            margin-left: 4px;
-            cursor: help;
-        }
     </style>
 </head>
 <body>
-    <div id="container">
-        <!-- Main Header -->
-        <header class="main-header">
-            <div class="model-status">
-                <div class="status-dot" id="statusDot" aria-label="Connection status"></div>
-                <div class="model-info">
-                    <h2 id="modelName">No Model Loaded</h2>
-                    <p id="modelDetails">Select and load a model to begin</p>
-                </div>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="app-title">
+                <h1>LLM Research Interface</h1>
+                <span class="research-badge">Scientific</span>
             </div>
-            <div class="quick-actions">
-                <button class="btn" id="loadModelBtn">
-                    <span>🔄</span> Load Model
-                </button>
-                <button class="btn primary" id="generateBtn" disabled>
-                    <span>✨</span> Generate
-                </button>
-                <button class="btn" id="compareBtn">
-                    <span>⚖️</span> Compare
-                </button>
-                <button class="btn" id="exportBtn">
-                    <span>💾</span> Export
-                </button>
+            <div class="model-status">
+                <span class="status-indicator" id="statusIndicator" aria-label="Model status"></span>
+                <span id="modelStatus">Initializing...</span>
             </div>
         </header>
 
-        <!-- Visualization Area -->
-        <main class="visualization-area">
-            <canvas id="babylonCanvas" aria-label="Interactive 3D visualization of token embeddings"></canvas>
-            <div class="viz-overlay" id="vizOverlay">
-                <div>View: <span id="currentView">Token Embeddings</span></div>
-                <div>Layer: <span id="currentLayer">6</span>/12</div>
-                <div>Tokens: <span id="tokenCount">0</span></div>
-            </div>
-            <div class="viz-help">
-                <strong>Touch:</strong> Tap tokens to analyze • Pinch to zoom • Two fingers to rotate
-            </div>
-        </main>
-
-        <!-- Control Panel -->
-        <aside class="control-panel">
+        <!-- Controls Panel -->
+        <aside class="controls-panel">
             <div class="panel-header">
-                <h3>Experiment Controls</h3>
-                <p>Configure your research parameters</p>
+                <h3>Experiment Configuration</h3>
+                <p>Configure parameters for probability analysis</p>
             </div>
             <div class="panel-content">
                 <div class="form-group">
+                    <label class="form-label" for="modelSelect">
+                        Model Selection
+                        <span class="help-icon" data-tooltip="Choose the language model for analysis">?</span>
+                    </label>
+                    <select class="form-input" id="modelSelect">
+                        <option value="">Select a model...</option>
+                        <option value="Phi-2-GGUF">Phi-2 (2.7B) - Microsoft Research</option>
+                        <option value="TinyLlama-1.1B-Chat-v0.4-q4f16_1-1k">TinyLlama (1.1B) - Fast inference</option>
+                    </select>
+                    <button class="btn primary" id="loadModelBtn" style="margin-top: 8px;">
+                        Load Model
+                    </button>
+                </div>
+
+                <div class="form-group">
                     <label class="form-label" for="promptInput">
                         Research Prompt
-                        <span class="help-icon tooltip" data-tooltip="Enter the text you want the model to continue">?</span>
+                        <span class="help-icon" data-tooltip="Text for the model to continue. Affects probability distributions.">?</span>
                     </label>
                     <textarea 
                         class="form-input form-textarea" 
                         id="promptInput" 
-                        placeholder="The neural network's attention mechanism..."
-                        value="The neural network's attention mechanism">The neural network's attention mechanism</textarea>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="modelSelect">Model Selection</label>
-                    <select class="form-input" id="modelSelect">
-                        <option value="">Select a model...</option>
-                        <option value="Phi-2-GGUF">Phi-2 (2.7B) - Balanced</option>
-                        <option value="TinyLlama-1.1B-Chat-v0.4-q4f16_1-1k">TinyLlama (1.1B) - Fast</option>
-                    </select>
+                        placeholder="Enter research prompt...">The transformer architecture uses attention mechanisms to</textarea>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">
-                        Temperature: Creativity Control
-                        <span class="help-icon tooltip" data-tooltip="Higher = more creative, Lower = more focused">?</span>
+                        Temperature
+                        <span class="help-icon" data-tooltip="Controls randomness: 0.1=focused, 2.0=creative. Affects probability distributions.">?</span>
                     </label>
                     <div class="slider-group">
                         <input type="range" class="slider" id="tempSlider" 
-                               min="0.1" max="2.0" step="0.1" value="0.7">
-                        <span class="slider-value" id="tempValue">0.7</span>
+                               min="0.1" max="2.0" step="0.1" value="1.0">
+                        <span class="slider-value" id="tempValue">1.0</span>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Visualization Layer</label>
-                    <div class="slider-group">
-                        <input type="range" class="slider" id="layerSlider" 
-                               min="0" max="11" step="1" value="6">
-                        <span class="slider-value" id="layerValue">6</span>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="maxTokens">Max Tokens</label>
+                    <label class="form-label">
+                        Max Tokens
+                        <span class="help-icon" data-tooltip="Number of tokens to generate for analysis">?</span>
+                    </label>
                     <input type="number" class="form-input" id="maxTokens" 
-                           min="5" max="100" value="25" placeholder="25">
+                           min="5" max="50" value="20">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        Top-K Alternatives
+                        <span class="help-icon" data-tooltip="Number of alternative tokens to analyze (affects entropy calculation)">?</span>
+                    </label>
+                    <div class="slider-group">
+                        <input type="range" class="slider" id="topKSlider" 
+                               min="3" max="20" step="1" value="10">
+                        <span class="slider-value" id="topKValue">10</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <button class="btn primary" id="generateBtn" disabled style="width: 100%;">
+                        Generate & Analyze
+                    </button>
+                    <button class="btn warning" id="stopBtn" disabled style="width: 100%; margin-top: 6px;">
+                        Stop Generation
+                    </button>
                 </div>
             </div>
         </aside>
 
+        <!-- Visualization Area -->
+        <main class="visualization-area">
+            <canvas id="probabilityCanvas" aria-label="Probability distribution visualization"></canvas>
+            <div class="viz-overlay" id="vizOverlay">
+                <div>Analysis: <span id="currentAnalysis">Token Probabilities</span></div>
+                <div>Tokens: <span id="tokenCount">0</span></div>
+                <div>Avg Entropy: <span id="avgEntropy">0.00</span></div>
+            </div>
+            <div class="viz-help">
+                Visualization shows token probability distributions and uncertainty patterns
+            </div>
+        </main>
+
         <!-- Results Panel -->
         <section class="results-panel">
             <div class="results-tabs">
-                <button class="tab active" data-tab="live">Live Analysis</button>
-                <button class="tab" data-tab="sequence">Token Sequence</button>
-                <button class="tab" data-tab="comparison">Comparison</button>
+                <button class="tab active" data-tab="metrics">Metrics</button>
+                <button class="tab" data-tab="sequence">Sequence</button>
+                <button class="tab" data-tab="analysis">Analysis</button>
                 <button class="tab" data-tab="export">Export</button>
             </div>
 
-            <div class="tab-content active" id="live-content">
+            <div class="tab-content active" id="metrics-content">
                 <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div class="metric-value" id="entropyValue">0.00</div>
-                        <div class="metric-label">Entropy</div>
+                    <div class="metric-card uncertainty-low" id="entropyCard">
+                        <div class="metric-value" id="currentEntropy">0.00</div>
+                        <div class="metric-label">Entropy (bits)</div>
                     </div>
-                    <div class="metric-card">
-                        <div class="metric-value" id="confidenceValue">0%</div>
+                    <div class="metric-card uncertainty-low" id="confidenceCard">
+                        <div class="metric-value" id="currentConfidence">0%</div>
                         <div class="metric-label">Confidence</div>
                     </div>
-                    <div class="metric-card">
-                        <div class="metric-value" id="uncertaintyValue">Low</div>
-                        <div class="metric-label">Uncertainty</div>
+                    <div class="metric-card uncertainty-low" id="surprisalCard">
+                        <div class="metric-value" id="currentSurprisal">0.0</div>
+                        <div class="metric-label">Surprisal</div>
                     </div>
-                    <div class="metric-card">
-                        <div class="metric-value" id="surpriseValue">0.0</div>
-                        <div class="metric-label">Surprise</div>
+                    <div class="metric-card uncertainty-low" id="perplexityCard">
+                        <div class="metric-value" id="currentPerplexity">0.0</div>
+                        <div class="metric-label">Perplexity</div>
                     </div>
                 </div>
-                <div class="generation-output" id="liveOutput">
-                    Ready to generate. Click the Generate button to start analyzing.
+                <div class="probability-details" id="probabilityDetails">
+                    Ready to analyze token probabilities. Load a model and generate text to see real-time probability distributions.
                 </div>
             </div>
 
             <div class="tab-content" id="sequence-content">
-                <div class="token-stream" id="tokenStream"></div>
-                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
-                    Click tokens to see alternatives • <span class="token uncertain">Yellow</span> = high uncertainty
+                <div class="token-sequence">
+                    <div class="sequence-header">Generated Token Sequence</div>
+                    <div class="token-stream" id="tokenStream"></div>
+                    <div style="font-size: 10px; color: var(--text-secondary); margin-top: 6px;">
+                        Click tokens to see alternatives • 
+                        <span style="color: var(--uncertainty-high);">Red</span> = high uncertainty • 
+                        <span style="color: var(--uncertainty-med);">Orange</span> = medium uncertainty
+                    </div>
                 </div>
+                <div class="alternative-tokens" id="alternativeTokens"></div>
             </div>
 
-            <div class="tab-content" id="comparison-content">
-                <div class="comparison-view" id="comparisonView">
-                    <div class="comparison-item">
-                        <h4>Prompt A</h4>
-                        <div class="output">No comparison data yet</div>
-                        <div class="comparison-metrics">
-                            Avg Confidence: <span>-</span> | Entropy: <span>-</span>
-                        </div>
+            <div class="tab-content" id="analysis-content">
+                <div id="statisticalAnalysis">
+                    <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">
+                        Statistical Analysis (requires &gt;10 tokens)
                     </div>
-                    <div class="comparison-item">
-                        <h4>Prompt B</h4>
-                        <div class="output">Run a comparison to see results</div>
-                        <div class="comparison-metrics">
-                            Avg Confidence: <span>-</span> | Entropy: <span>-</span>
-                        </div>
+                    <div id="statsResults">
+                        Generate tokens to see statistical analysis of uncertainty patterns.
                     </div>
                 </div>
             </div>
 
             <div class="tab-content" id="export-content">
-                <div style="font-size: 12px; line-height: 1.5; color: var(--text-secondary);">
-                    <p style="margin-bottom: 12px;"><strong>Export includes:</strong></p>
-                    <ul style="margin-left: 16px; margin-bottom: 16px;">
-                        <li>Token probabilities and alternatives</li>
-                        <li>Entropy and uncertainty metrics</li>
-                        <li>Model parameters and settings</li>
-                        <li>Visualization data points</li>
-                    </ul>
-                    <button class="btn primary" id="doExportBtn">Download Research Data (JSON)</button>
+                <div style="font-size: 11px; line-height: 1.5;">
+                    <p style="margin-bottom: 10px; color: var(--text-secondary);">
+                        <strong>Research Data Export</strong>
+                    </p>
+                    <p style="margin-bottom: 10px; font-size: 10px;">
+                        Exports include: token probabilities, entropy values, surprisal metrics, 
+                        alternative tokens, model parameters, and reproducibility metadata.
+                    </p>
+                    <button class="btn primary" id="exportJsonBtn" style="width: 100%; margin-bottom: 6px;">
+                        Export JSON (Research Data)
+                    </button>
+                    <button class="btn" id="exportCsvBtn" style="width: 100%;">
+                        Export CSV (Statistical Analysis)
+                    </button>
                 </div>
             </div>
         </section>
+
+        <!-- Status Bar -->
+        <footer class="status-bar">
+            <div class="experiment-info">
+                <span>Experiment ID: <span id="experimentId">-</span></span>
+                <span>Tokens Generated: <span id="totalTokens">0</span></span>
+                <span>Avg Uncertainty: <span id="avgUncertainty">-</span></span>
+            </div>
+            <div class="export-actions">
+                <span id="lastExport">No exports yet</span>
+            </div>
+        </footer>
     </div>
 
     <!-- Loading Screen -->
     <div class="loading-screen" id="loadingScreen">
         <div class="loading-spinner"></div>
         <div class="loading-text" id="loadingText">Initializing WebLLM...</div>
-        <div class="loading-details" id="loadingDetails">This may take a moment on first load</div>
+        <div class="loading-details" id="loadingDetails">Setting up research environment</div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babylonjs/6.0.0/babylon.min.js"></script>
     <script type="module">
         import * as webllm from "https://esm.run/@mlc-ai/web-llm";
 
-        class LLMResearchExplorer {
+        /**
+         * Statistical analysis utilities for probability distributions
+         */
+        class StatisticalAnalysis {
+            static calculateEntropy(probabilities) {
+                return -probabilities.reduce((sum, p) => {
+                    return p > 0 ? sum + p * Math.log2(p) : sum;
+                }, 0);
+            }
+
+            static calculateSurprisal(probability) {
+                return -Math.log2(Math.max(probability, 1e-10));
+            }
+
+            static calculatePerplexity(probabilities) {
+                const entropy = this.calculateEntropy(probabilities);
+                return Math.pow(2, entropy);
+            }
+
+            static classifyUncertainty(entropy) {
+                if (entropy > 3.0) return 'high';
+                if (entropy > 1.5) return 'medium';
+                return 'low';
+            }
+
+            static calculateStatistics(entropies) {
+                if (entropies.length === 0) return null;
+                
+                const sorted = [...entropies].sort((a, b) => a - b);
+                const mean = entropies.reduce((a, b) => a + b) / entropies.length;
+                const variance = entropies.reduce((sum, x) => sum + Math.pow(x - mean, 2), 0) / entropies.length;
+                
+                return {
+                    mean: mean,
+                    median: sorted[Math.floor(sorted.length / 2)],
+                    std: Math.sqrt(variance),
+                    min: sorted[0],
+                    max: sorted[sorted.length - 1],
+                    q25: sorted[Math.floor(sorted.length * 0.25)],
+                    q75: sorted[Math.floor(sorted.length * 0.75)]
+                };
+            }
+        }
+
+        /**
+         * Probability visualization using Canvas
+         */
+        class ProbabilityVisualizer {
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.tokens = [];
+                this.maxTokens = 50;
+                
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+            }
+
+            resizeCanvas() {
+                const rect = this.canvas.getBoundingClientRect();
+                this.canvas.width = rect.width * window.devicePixelRatio;
+                this.canvas.height = rect.height * window.devicePixelRatio;
+                this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                this.canvas.style.width = rect.width + 'px';
+                this.canvas.style.height = rect.height + 'px';
+                this.redraw();
+            }
+
+            addToken(tokenData) {
+                this.tokens.push(tokenData);
+                if (this.tokens.length > this.maxTokens) {
+                    this.tokens.shift();
+                }
+                this.redraw();
+            }
+
+            redraw() {
+                const rect = this.canvas.getBoundingClientRect();
+                this.ctx.clearRect(0, 0, rect.width, rect.height);
+                
+                if (this.tokens.length === 0) {
+                    this.drawPlaceholder();
+                    return;
+                }
+
+                // Draw entropy over time
+                this.drawEntropyGraph();
+                
+                // Draw current probability distribution
+                this.drawProbabilityDistribution();
+            }
+
+            drawPlaceholder() {
+                const rect = this.canvas.getBoundingClientRect();
+                this.ctx.fillStyle = 'rgba(123, 179, 255, 0.3)';
+                this.ctx.font = '14px var(--font-primary)';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('Generate tokens to see probability analysis', rect.width / 2, rect.height / 2);
+            }
+
+            drawEntropyGraph() {
+                const rect = this.canvas.getBoundingClientRect();
+                const margin = 40;
+                const graphWidth = rect.width - 2 * margin;
+                const graphHeight = (rect.height / 2) - margin;
+                
+                if (this.tokens.length < 2) return;
+
+                // Draw axes
+                this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                this.ctx.moveTo(margin, margin);
+                this.ctx.lineTo(margin, margin + graphHeight);
+                this.ctx.lineTo(margin + graphWidth, margin + graphHeight);
+                this.ctx.stroke();
+
+                // Draw entropy line
+                this.ctx.strokeStyle = '#7bb3ff';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                
+                const maxEntropy = Math.max(...this.tokens.map(t => t.entropy));
+                const minEntropy = Math.min(...this.tokens.map(t => t.entropy));
+                const entropyRange = maxEntropy - minEntropy || 1;
+
+                this.tokens.forEach((token, index) => {
+                    const x = margin + (index / (this.tokens.length - 1)) * graphWidth;
+                    const y = margin + graphHeight - ((token.entropy - minEntropy) / entropyRange) * graphHeight;
+                    
+                    if (index === 0) {
+                        this.ctx.moveTo(x, y);
+                    } else {
+                        this.ctx.lineTo(x, y);
+                    }
+                });
+                
+                this.ctx.stroke();
+
+                // Labels
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                this.ctx.font = '10px var(--font-mono)';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('Entropy over time', margin, margin - 10);
+            }
+
+            drawProbabilityDistribution() {
+                const rect = this.canvas.getBoundingClientRect();
+                const margin = 40;
+                const startY = rect.height / 2 + 20;
+                const graphWidth = rect.width - 2 * margin;
+                const graphHeight = (rect.height / 2) - margin - 20;
+                
+                if (this.tokens.length === 0) return;
+
+                const currentToken = this.tokens[this.tokens.length - 1];
+                if (!currentToken.alternatives || currentToken.alternatives.length === 0) return;
+
+                // Draw bars for top alternatives
+                const barWidth = graphWidth / currentToken.alternatives.length;
+                
+                currentToken.alternatives.forEach((alt, index) => {
+                    const prob = Math.exp(alt.logprob);
+                    const barHeight = prob * graphHeight;
+                    const x = margin + index * barWidth;
+                    const y = startY + graphHeight - barHeight;
+                    
+                    // Color based on probability
+                    const alpha = 0.3 + prob * 0.7;
+                    this.ctx.fillStyle = `rgba(123, 179, 255, ${alpha})`;
+                    this.ctx.fillRect(x + 2, y, barWidth - 4, barHeight);
+                    
+                    // Token text
+                    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                    this.ctx.font = '9px var(--font-mono)';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(
+                        alt.token.substring(0, 8), 
+                        x + barWidth / 2, 
+                        startY + graphHeight + 15
+                    );
+                });
+
+                // Label
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                this.ctx.font = '10px var(--font-mono)';
+                this.ctx.textAlign = 'left';
+                this.ctx.fillText('Current token alternatives', margin, startY - 10);
+            }
+
+            clear() {
+                this.tokens = [];
+                this.redraw();
+            }
+        }
+
+        /**
+         * Main research interface application
+         */
+        class LLMResearchInterface {
             constructor() {
                 this.engine = null;
                 this.currentModel = null;
-                this.babylonEngine = null;
-                this.scene = null;
-                this.camera = null;
                 this.isGenerating = false;
                 this.tokenData = [];
-                this.comparisonData = { A: null, B: null };
-                this.currentTab = 'live';
+                this.experimentId = this.generateExperimentId();
+                this.visualizer = new ProbabilityVisualizer('probabilityCanvas');
                 
                 this.init();
             }
 
+            generateExperimentId() {
+                return 'exp_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 5);
+            }
+
             async init() {
                 try {
-                    this.updateLoadingText('Initializing 3D visualization...');
-                    await this.initBabylon();
+                    this.updateLoadingText('Initializing WebLLM engine...', 'This may take a moment');
                     
-                    this.updateLoadingText('Loading WebLLM engine...');
-                    await this.initWebLLM();
-                    
+                    this.engine = new webllm.MLCEngine();
                     this.setupEventListeners();
+                    this.updateUI();
+                    
                     this.hideLoadingScreen();
-                    this.updateModelStatus('ready', 'WebLLM Ready', 'Select a model to begin research');
+                    this.updateModelStatus('WebLLM ready - select a model');
+                    document.getElementById('experimentId').textContent = this.experimentId;
                     
                 } catch (error) {
                     console.error('Initialization failed:', error);
-                    this.updateLoadingText(`Error: ${error.message}`, 'Please refresh the page');
+                    this.updateLoadingText('Initialization failed', error.message);
                 }
-            }
-
-            async initBabylon() {
-                const canvas = document.getElementById('babylonCanvas');
-                this.babylonEngine = new BABYLON.Engine(canvas, true, {
-                    antialias: true,
-                    stencil: false,
-                    preserveDrawingBuffer: false
-                });
-                
-                this.scene = new BABYLON.Scene(this.babylonEngine);
-                
-                // Camera
-                this.camera = new BABYLON.ArcRotateCamera("camera", 
-                    -Math.PI / 2, Math.PI / 2.5, 8, BABYLON.Vector3.Zero(), this.scene);
-                this.camera.attachControls(canvas, true);
-                this.camera.wheelPrecision = 50;
-                
-                // Lighting
-                const light = new BABYLON.HemisphericLight("light", 
-                    new BABYLON.Vector3(0, 1, 0), this.scene);
-                light.intensity = 0.8;
-                
-                // Create initial embedding space
-                this.createEmbeddingVisualization();
-                
-                // Render loop
-                this.babylonEngine.runRenderLoop(() => {
-                    this.scene.render();
-                });
-                
-                window.addEventListener('resize', () => {
-                    this.babylonEngine.resize();
-                });
-            }
-
-            createEmbeddingVisualization() {
-                // Create a simple point cloud for now
-                const positions = [];
-                const colors = [];
-                
-                for (let i = 0; i < 200; i++) {
-                    positions.push(
-                        (Math.random() - 0.5) * 8,
-                        (Math.random() - 0.5) * 8,
-                        (Math.random() - 0.5) * 8
-                    );
-                    
-                    colors.push(0.5, 0.7, 1.0, 0.6);
-                }
-                
-                const pointCloud = new BABYLON.PointsCloudSystem("embeddings", 200, this.scene);
-                pointCloud.addPoints(200, (particle, i) => {
-                    particle.position.x = positions[i * 3];
-                    particle.position.y = positions[i * 3 + 1];
-                    particle.position.z = positions[i * 3 + 2];
-                    particle.color.r = colors[i * 4];
-                    particle.color.g = colors[i * 4 + 1];
-                    particle.color.b = colors[i * 4 + 2];
-                    particle.color.a = colors[i * 4 + 3];
-                });
-                
-                pointCloud.buildMesh();
-            }
-
-            async initWebLLM() {
-                this.engine = new webllm.MLCEngine();
             }
 
             setupEventListeners() {
@@ -944,7 +1102,11 @@
 
                 // Generation
                 document.getElementById('generateBtn').addEventListener('click', () => {
-                    this.generateText();
+                    this.generateAndAnalyze();
+                });
+
+                document.getElementById('stopBtn').addEventListener('click', () => {
+                    this.stopGeneration();
                 });
 
                 // Tab switching
@@ -954,28 +1116,22 @@
                     });
                 });
 
-                // Sliders
+                // Slider updates
                 document.getElementById('tempSlider').addEventListener('input', (e) => {
                     document.getElementById('tempValue').textContent = e.target.value;
                 });
 
-                document.getElementById('layerSlider').addEventListener('input', (e) => {
-                    document.getElementById('layerValue').textContent = e.target.value;
-                    document.getElementById('currentLayer').textContent = e.target.value;
+                document.getElementById('topKSlider').addEventListener('input', (e) => {
+                    document.getElementById('topKValue').textContent = e.target.value;
                 });
 
-                // Export
-                document.getElementById('exportBtn').addEventListener('click', () => {
-                    this.switchTab('export');
+                // Export buttons
+                document.getElementById('exportJsonBtn').addEventListener('click', () => {
+                    this.exportData('json');
                 });
 
-                document.getElementById('doExportBtn').addEventListener('click', () => {
-                    this.exportData();
-                });
-
-                // Comparison
-                document.getElementById('compareBtn').addEventListener('click', () => {
-                    this.switchTab('comparison');
+                document.getElementById('exportCsvBtn').addEventListener('click', () => {
+                    this.exportData('csv');
                 });
             }
 
@@ -983,30 +1139,30 @@
                 try {
                     const modelId = document.getElementById('modelSelect').value;
                     if (!modelId) {
-                        alert('Please select a model first');
+                        alert('Please select a model');
                         return;
                     }
 
-                    this.updateModelStatus('loading', 'Loading Model...', 'This may take a few minutes');
+                    this.updateModelStatus('Loading model...');
                     this.showLoadingScreen();
+                    this.updateLoadingText(`Loading ${modelId}...`, 'This may take several minutes');
                     
                     await this.engine.reload(modelId);
                     this.currentModel = modelId;
                     
-                    this.updateModelStatus('ready', modelId, 'Ready for text generation');
                     this.hideLoadingScreen();
-                    
-                    // Enable generate button
+                    this.updateModelStatus(`${modelId} loaded and ready`);
                     document.getElementById('generateBtn').disabled = false;
                     
                 } catch (error) {
                     console.error('Model loading failed:', error);
-                    this.updateModelStatus('error', 'Loading Failed', error.message);
+                    this.updateModelStatus('Model loading failed');
                     this.hideLoadingScreen();
+                    alert(`Failed to load model: ${error.message}`);
                 }
             }
 
-            async generateText() {
+            async generateAndAnalyze() {
                 if (!this.currentModel || this.isGenerating) return;
                 
                 const prompt = document.getElementById('promptInput').value.trim();
@@ -1017,11 +1173,13 @@
 
                 this.isGenerating = true;
                 this.tokenData = [];
-                this.updateGenerationUI(true);
+                this.visualizer.clear();
+                this.updateGenerationUI();
                 
                 try {
                     const temperature = parseFloat(document.getElementById('tempSlider').value);
                     const maxTokens = parseInt(document.getElementById('maxTokens').value);
+                    const topK = parseInt(document.getElementById('topKValue').textContent);
                     
                     const messages = [{ role: "user", content: prompt }];
                     const stream = await this.engine.chat.completions.create({
@@ -1030,75 +1188,117 @@
                         max_tokens: maxTokens,
                         stream: true,
                         logprobs: true,
-                        top_logprobs: 5
+                        top_logprobs: topK
                     });
 
-                    let fullOutput = "";
-                    let tokenCount = 0;
-
+                    let tokenPosition = 0;
                     for await (const chunk of stream) {
                         if (!this.isGenerating) break;
                         
                         const choice = chunk.choices[0];
-                        if (choice?.delta?.content) {
-                            const token = choice.delta.content;
-                            fullOutput += token;
-                            tokenCount++;
-                            
-                            const tokenInfo = this.processTokenData(choice, tokenCount);
+                        if (choice?.delta?.content && choice?.logprobs) {
+                            tokenPosition++;
+                            const tokenInfo = this.processTokenData(choice, tokenPosition);
                             this.tokenData.push(tokenInfo);
                             
-                            this.updateLiveAnalysis(tokenInfo, fullOutput);
-                            this.updateTokenSequence();
-                            this.visualizeToken(tokenInfo);
+                            this.updateRealTimeAnalysis(tokenInfo);
+                            this.visualizer.addToken(tokenInfo);
                             
-                            await new Promise(resolve => setTimeout(resolve, 150));
+                            // Throttle updates for performance
+                            await new Promise(resolve => setTimeout(resolve, 200));
                         }
                     }
                     
+                    this.finalizeAnalysis();
+                    
                 } catch (error) {
                     console.error('Generation failed:', error);
-                    document.getElementById('liveOutput').textContent = `Error: ${error.message}`;
+                    alert(`Generation failed: ${error.message}`);
                 } finally {
                     this.isGenerating = false;
-                    this.updateGenerationUI(false);
+                    this.updateGenerationUI();
                 }
             }
 
             processTokenData(choice, position) {
-                const logprobs = choice.logprobs;
-                const probability = logprobs ? Math.exp(logprobs.content[0].logprob) : 0.5;
+                const logprobs = choice.logprobs.content[0];
+                const token = choice.delta.content;
+                const tokenLogprob = logprobs.logprob;
+                const tokenProbability = Math.exp(tokenLogprob);
                 
-                let entropy = 0;
-                if (logprobs?.content[0]?.top_logprobs) {
-                    for (const token of logprobs.content[0].top_logprobs) {
-                        const prob = Math.exp(token.logprob);
-                        if (prob > 0) entropy -= prob * Math.log2(prob);
-                    }
-                }
-
-                const uncertainty = entropy > 2.5 ? 'High' : entropy > 1.5 ? 'Medium' : 'Low';
-                const surprise = -Math.log2(probability);
-
+                // Get alternatives
+                const alternatives = logprobs.top_logprobs || [];
+                const allProbs = alternatives.map(alt => Math.exp(alt.logprob));
+                
+                // Calculate metrics
+                const entropy = StatisticalAnalysis.calculateEntropy(allProbs);
+                const surprisal = StatisticalAnalysis.calculateSurprisal(tokenProbability);
+                const perplexity = StatisticalAnalysis.calculatePerplexity(allProbs);
+                const uncertainty = StatisticalAnalysis.classifyUncertainty(entropy);
+                
                 return {
-                    token: choice.delta.content,
+                    token,
                     position,
-                    probability,
+                    logprob: tokenLogprob,
+                    probability: tokenProbability,
+                    alternatives,
                     entropy,
+                    surprisal,
+                    perplexity,
                     uncertainty,
-                    surprise,
-                    alternatives: logprobs?.content[0]?.top_logprobs || [],
                     timestamp: Date.now()
                 };
             }
 
-            updateLiveAnalysis(tokenInfo, fullOutput) {
-                document.getElementById('entropyValue').textContent = tokenInfo.entropy.toFixed(2);
-                document.getElementById('confidenceValue').textContent = `${(tokenInfo.probability * 100).toFixed(1)}%`;
-                document.getElementById('uncertaintyValue').textContent = tokenInfo.uncertainty;
-                document.getElementById('surpriseValue').textContent = tokenInfo.surprise.toFixed(1);
-                document.getElementById('liveOutput').textContent = fullOutput;
+            updateRealTimeAnalysis(tokenInfo) {
+                // Update current metrics
+                document.getElementById('currentEntropy').textContent = tokenInfo.entropy.toFixed(2);
+                document.getElementById('currentConfidence').textContent = `${(tokenInfo.probability * 100).toFixed(1)}%`;
+                document.getElementById('currentSurprisal').textContent = tokenInfo.surprisal.toFixed(1);
+                document.getElementById('currentPerplexity').textContent = tokenInfo.perplexity.toFixed(1);
+                
+                // Update metric card styles based on uncertainty
+                const cards = ['entropyCard', 'confidenceCard', 'surprisalCard', 'perplexityCard'];
+                cards.forEach(cardId => {
+                    const card = document.getElementById(cardId);
+                    card.className = `metric-card uncertainty-${tokenInfo.uncertainty}`;
+                });
+                
+                // Update overlay
                 document.getElementById('tokenCount').textContent = tokenInfo.position;
+                const avgEntropy = this.tokenData.reduce((sum, t) => sum + t.entropy, 0) / this.tokenData.length;
+                document.getElementById('avgEntropy').textContent = avgEntropy.toFixed(2);
+                
+                // Update probability details
+                const details = this.formatProbabilityDetails(tokenInfo);
+                document.getElementById('probabilityDetails').innerHTML = details;
+                
+                // Update token sequence
+                this.updateTokenSequence();
+                
+                // Update status bar
+                document.getElementById('totalTokens').textContent = this.tokenData.length;
+                const avgUncertainty = this.calculateAverageUncertainty();
+                document.getElementById('avgUncertainty').textContent = avgUncertainty;
+            }
+
+            formatProbabilityDetails(tokenInfo) {
+                let html = `<strong>Token:</strong> "${tokenInfo.token}"<br>`;
+                html += `<strong>Probability:</strong> ${(tokenInfo.probability * 100).toFixed(2)}% (log: ${tokenInfo.logprob.toFixed(3)})<br>`;
+                html += `<strong>Entropy:</strong> ${tokenInfo.entropy.toFixed(2)} bits<br>`;
+                html += `<strong>Surprisal:</strong> ${tokenInfo.surprisal.toFixed(2)} bits<br>`;
+                html += `<strong>Uncertainty:</strong> ${tokenInfo.uncertainty}<br><br>`;
+                
+                if (tokenInfo.alternatives.length > 1) {
+                    html += `<strong>Top ${tokenInfo.alternatives.length} alternatives:</strong><br>`;
+                    tokenInfo.alternatives.slice(0, 5).forEach((alt, index) => {
+                        const prob = Math.exp(alt.logprob);
+                        const isSelected = alt.token === tokenInfo.token;
+                        html += `${index + 1}. "${alt.token}" - ${(prob * 100).toFixed(1)}%${isSelected ? ' ★' : ''}<br>`;
+                    });
+                }
+                
+                return html;
             }
 
             updateTokenSequence() {
@@ -1107,12 +1307,8 @@
                 
                 this.tokenData.slice(-20).forEach((tokenData, index) => {
                     const tokenEl = document.createElement('span');
-                    tokenEl.className = 'token';
+                    tokenEl.className = `token ${tokenData.uncertainty}-uncertainty`;
                     tokenEl.textContent = tokenData.token;
-                    
-                    if (tokenData.uncertainty === 'High') {
-                        tokenEl.classList.add('uncertain');
-                    }
                     
                     if (index === this.tokenData.length - 1) {
                         tokenEl.classList.add('current');
@@ -1127,45 +1323,61 @@
             }
 
             showTokenDetails(tokenData) {
-                const details = tokenData.alternatives.slice(0, 3).map(alt => 
-                    `${alt.token}: ${(Math.exp(alt.logprob) * 100).toFixed(1)}%`
-                ).join('\n');
+                const alternativeTokens = document.getElementById('alternativeTokens');
+                alternativeTokens.innerHTML = '<div style="font-size: 11px; margin-bottom: 6px; color: var(--text-secondary);">Token Details</div>';
                 
-                alert(`Token: "${tokenData.token}"\nProbability: ${(tokenData.probability * 100).toFixed(1)}%\nEntropy: ${tokenData.entropy.toFixed(2)}\n\nAlternatives:\n${details}`);
+                if (tokenData.alternatives && tokenData.alternatives.length > 0) {
+                    tokenData.alternatives.forEach(alt => {
+                        const altEl = document.createElement('div');
+                        altEl.className = 'alternative-token';
+                        altEl.innerHTML = `
+                            <span class="alternative-token-text">"${alt.token}"</span>
+                            <span class="alternative-token-prob">${(Math.exp(alt.logprob) * 100).toFixed(1)}%</span>
+                        `;
+                        alternativeTokens.appendChild(altEl);
+                    });
+                }
+                
+                // Switch to sequence tab
+                this.switchTab('sequence');
             }
 
-            visualizeToken(tokenInfo) {
-                // Create a sphere for the token
-                const sphere = BABYLON.MeshBuilder.CreateSphere("token", {diameter: 0.3}, this.scene);
-                
-                // Position based on token properties
-                sphere.position.x = (Math.random() - 0.5) * 6;
-                sphere.position.y = (tokenInfo.probability - 0.5) * 4;
-                sphere.position.z = (Math.random() - 0.5) * 6;
-                
-                // Color based on uncertainty
-                const material = new BABYLON.StandardMaterial("tokenMat", this.scene);
-                material.emissiveColor = new BABYLON.Color3(
-                    tokenInfo.uncertainty === 'High' ? 1.0 : 0.3,
-                    tokenInfo.uncertainty === 'Low' ? 1.0 : 0.5,
-                    0.7
-                );
-                sphere.material = material;
-                
-                // Animate appearance
-                sphere.scaling = BABYLON.Vector3.Zero();
-                BABYLON.Animation.CreateAndStartAnimation("appear", sphere, "scaling", 
-                    30, 15, BABYLON.Vector3.Zero(), BABYLON.Vector3.One(), 0);
-                
-                // Remove after 5 seconds
-                setTimeout(() => {
-                    sphere.dispose();
-                }, 5000);
+            finalizeAnalysis() {
+                // Calculate final statistics
+                if (this.tokenData.length >= 10) {
+                    const entropies = this.tokenData.map(t => t.entropy);
+                    const stats = StatisticalAnalysis.calculateStatistics(entropies);
+                    
+                    const statsHtml = `
+                        <div style="font-size: 11px; line-height: 1.5;">
+                            <strong>Entropy Statistics (n=${this.tokenData.length})</strong><br>
+                            Mean: ${stats.mean.toFixed(2)} ± ${stats.std.toFixed(2)}<br>
+                            Median: ${stats.median.toFixed(2)}<br>
+                            Range: ${stats.min.toFixed(2)} - ${stats.max.toFixed(2)}<br>
+                            IQR: ${stats.q25.toFixed(2)} - ${stats.q75.toFixed(2)}<br><br>
+                            
+                            <strong>Uncertainty Distribution</strong><br>
+                            High: ${this.tokenData.filter(t => t.uncertainty === 'high').length} tokens<br>
+                            Medium: ${this.tokenData.filter(t => t.uncertainty === 'medium').length} tokens<br>
+                            Low: ${this.tokenData.filter(t => t.uncertainty === 'low').length} tokens
+                        </div>
+                    `;
+                    
+                    document.getElementById('statsResults').innerHTML = statsHtml;
+                }
+            }
+
+            calculateAverageUncertainty() {
+                if (this.tokenData.length === 0) return '-';
+                const avgEntropy = this.tokenData.reduce((sum, t) => sum + t.entropy, 0) / this.tokenData.length;
+                return StatisticalAnalysis.classifyUncertainty(avgEntropy);
+            }
+
+            stopGeneration() {
+                this.isGenerating = false;
             }
 
             switchTab(tabName) {
-                this.currentTab = tabName;
-                
                 // Update tab buttons
                 document.querySelectorAll('.tab').forEach(tab => {
                     tab.classList.toggle('active', tab.dataset.tab === tabName);
@@ -1177,58 +1389,94 @@
                 });
             }
 
-            updateGenerationUI(isGenerating) {
-                document.getElementById('generateBtn').disabled = isGenerating;
-                document.getElementById('generateBtn').innerHTML = isGenerating ? 
-                    '<span>⏹️</span> Stop' : '<span>✨</span> Generate';
-                
-                if (isGenerating) {
-                    document.getElementById('generateBtn').onclick = () => {
-                        this.isGenerating = false;
-                    };
-                } else {
-                    document.getElementById('generateBtn').onclick = () => {
-                        this.generateText();
-                    };
+            exportData(format) {
+                if (this.tokenData.length === 0) {
+                    alert('No data to export. Generate some tokens first.');
+                    return;
                 }
+
+                const exportData = {
+                    metadata: {
+                        experimentId: this.experimentId,
+                        timestamp: new Date().toISOString(),
+                        model: this.currentModel,
+                        prompt: document.getElementById('promptInput').value,
+                        parameters: {
+                            temperature: parseFloat(document.getElementById('tempSlider').value),
+                            maxTokens: parseInt(document.getElementById('maxTokens').value),
+                            topK: parseInt(document.getElementById('topKValue').textContent)
+                        },
+                        webllmVersion: "0.2.x",
+                        toolVersion: "1.0.0"
+                    },
+                    tokens: this.tokenData,
+                    statistics: this.tokenData.length >= 10 ? 
+                        StatisticalAnalysis.calculateStatistics(this.tokenData.map(t => t.entropy)) : null
+                };
+
+                if (format === 'json') {
+                    this.downloadJSON(exportData, `llm-research-${this.experimentId}.json`);
+                } else {
+                    this.downloadCSV(exportData, `llm-research-${this.experimentId}.csv`);
+                }
+
+                document.getElementById('lastExport').textContent = `Last export: ${new Date().toLocaleTimeString()}`;
             }
 
-            exportData() {
-                const data = {
-                    tokens: this.tokenData,
-                    model: this.currentModel,
-                    prompt: document.getElementById('promptInput').value,
-                    settings: {
-                        temperature: parseFloat(document.getElementById('tempSlider').value),
-                        maxTokens: parseInt(document.getElementById('maxTokens').value),
-                        layer: parseInt(document.getElementById('layerValue').textContent)
-                    },
-                    timestamp: new Date().toISOString(),
-                    summary: {
-                        totalTokens: this.tokenData.length,
-                        avgEntropy: this.tokenData.reduce((sum, t) => sum + t.entropy, 0) / this.tokenData.length || 0,
-                        avgConfidence: this.tokenData.reduce((sum, t) => sum + t.probability, 0) / this.tokenData.length || 0
-                    }
-                };
+            downloadJSON(data, filename) {
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                this.downloadBlob(blob, filename);
+            }
+
+            downloadCSV(data, filename) {
+                const headers = ['position', 'token', 'probability', 'logprob', 'entropy', 'surprisal', 'perplexity', 'uncertainty'];
+                const rows = data.tokens.map(token => [
+                    token.position,
+                    `"${token.token.replace(/"/g, '""')}"`,
+                    token.probability,
+                    token.logprob,
+                    token.entropy,
+                    token.surprisal,
+                    token.perplexity,
+                    token.uncertainty
+                ]);
                 
-                const blob = new Blob([JSON.stringify(data, null, 2)], 
-                    { type: 'application/json' });
+                const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                this.downloadBlob(blob, filename);
+            }
+
+            downloadBlob(blob, filename) {
                 const url = URL.createObjectURL(blob);
-                
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `llm-research-${Date.now()}.json`;
+                a.download = filename;
                 a.click();
-                
                 URL.revokeObjectURL(url);
             }
 
-            updateModelStatus(status, name, details) {
-                const statusDot = document.getElementById('statusDot');
-                statusDot.className = `status-dot ${status}`;
+            updateGenerationUI() {
+                document.getElementById('generateBtn').disabled = this.isGenerating || !this.currentModel;
+                document.getElementById('stopBtn').disabled = !this.isGenerating;
                 
-                document.getElementById('modelName').textContent = name;
-                document.getElementById('modelDetails').textContent = details;
+                if (this.isGenerating) {
+                    document.getElementById('generateBtn').textContent = 'Generating...';
+                } else {
+                    document.getElementById('generateBtn').textContent = 'Generate & Analyze';
+                }
+            }
+
+            updateModelStatus(status) {
+                document.getElementById('modelStatus').textContent = status;
+                
+                const indicator = document.getElementById('statusIndicator');
+                if (status.includes('Loading') || status.includes('Initializing')) {
+                    indicator.className = 'status-indicator loading';
+                } else if (status.includes('ready') || status.includes('loaded')) {
+                    indicator.className = 'status-indicator ready';
+                } else {
+                    indicator.className = 'status-indicator';
+                }
             }
 
             updateLoadingText(text, details = '') {
@@ -1243,11 +1491,17 @@
             hideLoadingScreen() {
                 document.getElementById('loadingScreen').style.display = 'none';
             }
+
+            updateUI() {
+                // Initial UI state
+                document.getElementById('generateBtn').disabled = true;
+                document.getElementById('stopBtn').disabled = true;
+            }
         }
 
-        // Initialize when DOM is ready
+        // Initialize application
         document.addEventListener('DOMContentLoaded', () => {
-            new LLMResearchExplorer();
+            new LLMResearchInterface();
         });
     </script>
 </body>
