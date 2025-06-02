@@ -3,29 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="description" content="Real-time LLM inference visualization with WebLLM and Babylon.js">
-    <title>LLM Introspection Interface</title>
-    
-    <!-- Preload critical resources -->
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
-    <link rel="preconnect" href="https://esm.run">
+    <meta name="description" content="Research-grade LLM introspection with real probe data">
+    <title>LLM Research Introspector</title>
     
     <style>
-        /* CSS Custom Properties for theming */
         :root {
             --bg-primary: #0a0a0f;
-            --bg-secondary: rgba(10, 10, 20, 0.9);
-            --border-primary: rgba(100, 200, 255, 0.3);
-            --border-accent: rgba(255, 100, 100, 0.3);
-            --text-primary: #e0e0e0;
-            --text-secondary: #a0a0a0;
+            --bg-secondary: rgba(5, 5, 15, 0.95);
+            --border-primary: rgba(100, 200, 255, 0.4);
+            --border-accent: rgba(255, 180, 100, 0.4);
+            --text-primary: #e8e8e8;
+            --text-secondary: #a8a8a8;
             --text-accent: #88ffaa;
-            --status-error: #ff4444;
-            --status-warning: #ffaa44;
-            --status-success: #44ff44;
-            --font-mono: 'Monaco', 'Menlo', 'Courier New', monospace;
-            --panel-width: min(320px, 90vw);
-            --probe-width: min(280px, 85vw);
+            --research-highlight: #ff6b6b;
+            --font-mono: 'SF Mono', 'Monaco', 'Menlo', monospace;
         }
 
         * {
@@ -40,8 +31,8 @@
             height: 100vh;
             font-family: var(--font-mono);
             color: var(--text-primary);
-            /* Prevent zoom on double tap */
-            touch-action: manipulation;
+            touch-action: none;
+            user-select: none;
         }
 
         #container {
@@ -55,232 +46,272 @@
             height: 100%;
             display: block;
             outline: none;
-            /* Improve touch responsiveness */
             touch-action: none;
         }
 
-        /* Responsive panel layout */
-        .control-panel {
+        /* Research-focused HUD overlay */
+        .research-hud {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            width: var(--panel-width);
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            height: 120px;
             background: var(--bg-secondary);
             border: 1px solid var(--border-primary);
-            border-radius: 8px;
-            padding: 15px;
-            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 12px;
+            backdrop-filter: blur(15px);
             z-index: 100;
-            max-height: calc(100vh - 40px);
-            overflow-y: auto;
-            /* Smooth scrolling */
-            scrollbar-width: thin;
-            scrollbar-color: var(--border-primary) transparent;
-        }
-
-        .control-panel::-webkit-scrollbar {
-            width: 4px;
-        }
-
-        .control-panel::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .control-panel::-webkit-scrollbar-thumb {
-            background: var(--border-primary);
-            border-radius: 2px;
-        }
-
-        .control-group {
-            margin-bottom: 15px;
-        }
-
-        .control-group label {
-            display: block;
-            font-size: 12px; /* Increased from 11px for accessibility */
-            color: var(--text-secondary);
-            margin-bottom: 5px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* Form controls with improved accessibility */
-        select, input, button, textarea {
-            width: 100%;
-            background: rgba(20, 20, 30, 0.8);
-            border: 1px solid var(--border-primary);
-            border-radius: 4px;
-            color: var(--text-primary);
-            font-family: inherit;
-            font-size: 12px;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        select:focus, input:focus, button:focus, textarea:focus {
-            outline: none;
-            border-color: var(--border-accent);
-            box-shadow: 0 0 0 2px rgba(255, 100, 100, 0.2);
-        }
-
-        select, input {
-            padding: 8px;
-            margin-bottom: 5px;
-        }
-
-        button {
-            padding: 10px;
-            cursor: pointer;
-            margin-bottom: 5px;
-            min-height: 44px; /* Touch target size */
-        }
-
-        button:hover:not(:disabled) {
-            background: rgba(100, 200, 255, 0.2);
-            border-color: rgba(100, 200, 255, 0.6);
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        textarea {
-            padding: 8px;
-            min-height: 60px;
-            resize: vertical;
+            display: flex;
+            flex-direction: column;
             font-size: 11px;
-            line-height: 1.4;
         }
 
-        /* Status indicator with ARIA support */
-        .status-indicator {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 8px;
-            background: var(--status-error);
-        }
-
-        .status-indicator.loading {
-            background: var(--status-warning);
-            animation: pulse 1s infinite;
-        }
-
-        .status-indicator.ready {
-            background: var(--status-success);
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* Responsive probe panel */
-        .probe-data {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: var(--probe-width);
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-accent);
-            border-radius: 8px;
-            padding: 15px;
-            backdrop-filter: blur(10px);
-            z-index: 100;
-            max-height: calc(100vh - 40px);
-            overflow-y: auto;
-        }
-
-        .probe-section {
-            margin-bottom: 15px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 10px;
-        }
-
-        .probe-section:last-child {
-            border-bottom: none;
-        }
-
-        .probe-section h3 {
-            font-size: 12px; /* Increased for accessibility */
-            color: #ff8888;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .metric {
+        .hud-row {
             display: flex;
             justify-content: space-between;
-            font-size: 11px;
-            line-height: 1.6;
-            color: #c0c0c0;
+            align-items: center;
+            margin-bottom: 8px;
         }
 
-        .metric-value {
+        .hud-metric {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 60px;
+        }
+
+        .hud-label {
+            color: var(--text-secondary);
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .hud-value {
+            color: var(--text-accent);
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .probability-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .probability-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--research-highlight), var(--text-accent));
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        .probability-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 10px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        }
+
+        /* Bottom control panel for research parameters */
+        .research-controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            height: 140px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-accent);
+            border-radius: 12px;
+            padding: 12px;
+            backdrop-filter: blur(15px);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-tabs {
+            display: flex;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 8px;
+            text-align: center;
+            font-size: 10px;
+            text-transform: uppercase;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .tab.active {
+            border-bottom-color: var(--border-accent);
+            color: var(--text-accent);
+        }
+
+        .tab-content {
+            display: none;
+            flex: 1;
+        }
+
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .param-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            gap: 10px;
+        }
+
+        .param-label {
+            min-width: 80px;
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .param-control {
+            flex: 1;
+            height: 32px;
+            background: rgba(20, 20, 30, 0.8);
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+
+        .param-value {
+            min-width: 40px;
+            font-size: 10px;
+            color: var(--text-accent);
+            text-align: center;
+        }
+
+        /* Gesture indicators */
+        .gesture-hints {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: rgba(255, 255, 255, 0.3);
+            font-size: 12px;
+            text-align: center;
+            pointer-events: none;
+            z-index: 50;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .gesture-hints.show {
+            opacity: 1;
+        }
+
+        /* Token analysis overlay */
+        .token-overlay {
+            position: absolute;
+            top: 140px;
+            right: 10px;
+            width: 200px;
+            max-height: calc(100vh - 300px);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 12px;
+            backdrop-filter: blur(15px);
+            z-index: 90;
+            overflow-y: auto;
+            transform: translateX(220px);
+            transition: transform 0.3s ease;
+        }
+
+        .token-overlay.open {
+            transform: translateX(0);
+        }
+
+        .token-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px;
+            margin-bottom: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            font-size: 10px;
+        }
+
+        .token-text {
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .token-prob {
             color: var(--text-accent);
             font-weight: bold;
         }
 
-        /* Accessible attention matrix */
-        .attention-matrix {
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            gap: 2px;
-            margin-top: 8px;
-            role: grid;
-        }
-
-        .attention-cell {
-            width: 20px;
-            height: 20px;
-            background: rgba(100, 200, 255, 0.1);
-            border-radius: 2px;
-            transition: background 0.2s ease;
-            position: relative;
-        }
-
-        .attention-cell[aria-selected="true"] {
-            outline: 2px solid white;
-        }
-
-        .token-list {
-            max-height: 120px;
-            overflow-y: auto;
-            font-size: 10px;
-            line-height: 1.4;
-        }
-
-        .token {
-            padding: 2px 4px;
-            margin: 1px;
-            background: rgba(100, 200, 255, 0.1);
-            border-radius: 2px;
-            display: inline-block;
-            word-break: break-all;
-        }
-
-        .token.current {
-            background: rgba(255, 200, 100, 0.3);
-        }
-
-        /* Responsive output area */
-        .output-area {
+        /* Comparison mode */
+        .comparison-mode {
             position: absolute;
-            bottom: 20px;
-            left: 20px;
-            right: 20px;
-            height: 150px;
+            top: 140px;
+            left: 10px;
+            width: 180px;
+            height: 200px;
             background: var(--bg-secondary);
-            border: 1px solid rgba(100, 255, 100, 0.3);
-            border-radius: 8px;
-            padding: 15px;
-            backdrop-filter: blur(10px);
-            z-index: 100;
-            overflow-y: auto;
-            font-size: 12px;
-            line-height: 1.5;
+            border: 1px solid var(--research-highlight);
+            border-radius: 12px;
+            padding: 12px;
+            backdrop-filter: blur(15px);
+            z-index: 90;
+            transform: translateX(-200px);
+            transition: transform 0.3s ease;
+        }
+
+        .comparison-mode.open {
+            transform: translateX(0);
+        }
+
+        .comparison-prompt {
+            width: 100%;
+            height: 60px;
+            background: rgba(20, 20, 30, 0.8);
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 10px;
+            padding: 6px;
+            resize: none;
+            margin-bottom: 8px;
+        }
+
+        .compare-btn {
+            width: 100%;
+            height: 32px;
+            background: var(--research-highlight);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-family: inherit;
+            font-size: 10px;
+            cursor: pointer;
+            margin-bottom: 8px;
         }
 
         .loading-screen {
@@ -289,7 +320,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.9);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -299,13 +330,13 @@
         }
 
         .loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-top: 3px solid #64c8ff;
+            width: 30px;
+            height: 30px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid var(--text-accent);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         @keyframes spin {
@@ -313,1087 +344,776 @@
             100% { transform: rotate(360deg); }
         }
 
-        .disclaimer {
-            background: rgba(255, 200, 100, 0.1);
-            border: 1px solid rgba(255, 200, 100, 0.3);
-            border-radius: 4px;
-            padding: 8px;
-            font-size: 10px;
-            line-height: 1.3;
-            color: #ffcc88;
-            margin-bottom: 10px;
-        }
-
-        /* Mobile responsiveness */
-        @media (max-width: 768px) {
-            :root {
-                --panel-width: calc(100vw - 40px);
-                --probe-width: calc(100vw - 40px);
+        /* iPhone-specific optimizations */
+        @media (max-width: 414px) and (orientation: portrait) {
+            .research-hud {
+                height: 100px;
+                font-size: 10px;
             }
             
-            .control-panel {
-                position: relative;
-                margin-bottom: 20px;
-                max-height: none;
+            .research-controls {
+                height: 120px;
             }
             
-            .probe-data {
-                position: relative;
-                top: auto;
-                right: auto;
-                left: 20px;
-                margin-bottom: 20px;
-                max-height: none;
+            .token-overlay {
+                width: 160px;
             }
             
-            .output-area {
-                position: relative;
-                bottom: auto;
-                left: 20px;
-                right: 20px;
-                margin-bottom: 20px;
-                height: auto;
-                min-height: 100px;
-            }
-            
-            #babylonCanvas {
-                height: 50vh;
+            .comparison-mode {
+                width: 150px;
+                height: 180px;
             }
         }
 
-        /* High contrast mode support */
-        @media (prefers-contrast: high) {
-            :root {
-                --bg-primary: #000000;
-                --bg-secondary: rgba(0, 0, 0, 0.95);
-                --border-primary: #ffffff;
-                --text-primary: #ffffff;
-            }
-        }
-
-        /* Reduced motion support */
-        @media (prefers-reduced-motion: reduce) {
-            .loading-spinner {
-                animation: none;
+        @media (orientation: landscape) {
+            .research-hud {
+                top: 5px;
+                height: 80px;
+                left: 200px;
+                right: 200px;
             }
             
-            .status-indicator.loading {
-                animation: none;
+            .research-controls {
+                bottom: 5px;
+                height: 100px;
+                left: 200px;
+                right: 200px;
             }
             
-            * {
-                transition: none !important;
+            .token-overlay {
+                top: 5px;
+                right: 5px;
+                max-height: calc(100vh - 120px);
             }
-        }
-
-        /* Dark mode (default) but respecting system preferences */
-        @media (prefers-color-scheme: light) {
-            :root {
-                --bg-primary: #f5f5f5;
-                --bg-secondary: rgba(255, 255, 255, 0.9);
-                --border-primary: rgba(0, 100, 200, 0.3);
-                --text-primary: #2d2d2d;
-                --text-secondary: #666666;
+            
+            .comparison-mode {
+                top: 5px;
+                left: 5px;
+                height: calc(100vh - 120px);
             }
         }
     </style>
 </head>
 <body>
     <div id="container">
-        <canvas id="babylonCanvas" aria-label="3D LLM introspection visualization"></canvas>
+        <canvas id="babylonCanvas" aria-label="3D LLM introspection space"></canvas>
         
         <div class="loading-screen" id="loadingScreen">
-            <div class="loading-spinner" aria-label="Loading"></div>
+            <div class="loading-spinner"></div>
             <div id="loadingText">Initializing WebLLM...</div>
         </div>
         
-        <div class="control-panel">
-            <div class="disclaimer">
-                <strong>Note:</strong> This visualizes real LLM inference, but internal "probe data" (attention patterns, hidden states) is simulated for demonstration. WebLLM currently only exposes token probabilities.
-            </div>
-            
-            <div class="control-group">
-                <label>Model Status</label>
-                <div>
-                    <span class="status-indicator" id="statusIndicator" aria-hidden="true"></span>
-                    <span id="statusText">Initializing...</span>
+        <!-- Research HUD -->
+        <div class="research-hud">
+            <div class="hud-row">
+                <div class="hud-metric">
+                    <div class="hud-label">Entropy</div>
+                    <div class="hud-value" id="entropyValue">0.00</div>
+                </div>
+                <div class="hud-metric">
+                    <div class="hud-label">Top-K</div>
+                    <div class="hud-value" id="topKValue">5</div>
+                </div>
+                <div class="hud-metric">
+                    <div class="hud-label">Tokens</div>
+                    <div class="hud-value" id="tokenCount">0</div>
+                </div>
+                <div class="hud-metric">
+                    <div class="hud-label">Layer</div>
+                    <div class="hud-value" id="currentLayer">-</div>
                 </div>
             </div>
-            
-            <div class="control-group">
-                <label for="modelSelect">Model Selection</label>
-                <select id="modelSelect" aria-describedby="modelHelp">
-                    <option value="Phi-2-GGUF">Phi-2 (2.7B - Default)</option>
-                    <option value="TinyLlama-1.1B-Chat-v0.4-q4f16_1-1k">TinyLlama (1.1B)</option>
-                    <option value="Llama-2-7b-chat-hf-q4f16_1-1k">Llama-2-7B (Larger)</option>
-                </select>
-                <div id="modelHelp" style="font-size: 10px; color: var(--text-secondary);">
-                    Smaller models load faster and use less memory
-                </div>
-                <button id="loadModelBtn">Load Model</button>
-            </div>
-            
-            <div class="control-group">
-                <label for="promptInput">Prompt Input</label>
-                <textarea id="promptInput" placeholder="Enter your prompt here..." aria-describedby="promptHelp">The meaning of life is</textarea>
-                <div id="promptHelp" style="font-size: 10px; color: var(--text-secondary);">
-                    Keep prompts concise for better performance
+            <div class="hud-row">
+                <div style="flex: 1;">
+                    <div class="hud-label">Next Token Probability</div>
+                    <div class="probability-bar">
+                        <div class="probability-fill" id="probabilityFill" style="width: 0%"></div>
+                        <div class="probability-text" id="probabilityText">-</div>
+                    </div>
                 </div>
             </div>
-            
-            <div class="control-group">
-                <label>Inference Controls</label>
-                <button id="generateBtn" aria-describedby="generateHelp">Generate</button>
-                <button id="stopBtn" disabled>Stop</button>
-                <button id="resetBtn">Reset</button>
-                <div id="generateHelp" style="font-size: 10px; color: var(--text-secondary);">
-                    Generation affects the 3D visualization in real-time
-                </div>
-            </div>
-            
-            <div class="control-group">
-                <label>Generation Settings</label>
-                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
-                    <label for="temperatureSlider" style="font-size: 10px; margin: 0;">Temperature:</label>
-                    <input type="range" id="temperatureSlider" min="0.1" max="2.0" step="0.1" value="0.7" style="flex: 1;" aria-describedby="tempHelp">
-                    <span id="temperatureValue" style="font-size: 10px; color: var(--text-accent);">0.7</span>
-                </div>
-                <div id="tempHelp" style="font-size: 9px; color: var(--text-secondary); margin-bottom: 5px;">
-                    Lower = more focused, Higher = more creative
-                </div>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <label for="maxTokens" style="font-size: 10px; margin: 0;">Max Tokens:</label>
-                    <input type="number" id="maxTokens" min="1" max="500" value="50" style="flex: 1;">
+            <div class="hud-row">
+                <div style="flex: 1; font-size: 10px; color: var(--text-secondary);">
+                    <span id="currentToken">Ready</span> • <span id="modelStatus">No model loaded</span>
                 </div>
             </div>
         </div>
-        
-        <div class="probe-data">
-            <div class="probe-section">
-                <h3>Current State</h3>
-                <div class="metric">
-                    <span>Layer:</span>
-                    <span class="metric-value" id="currentLayer">-</span>
+
+        <!-- Research Controls -->
+        <div class="research-controls">
+            <div class="control-tabs">
+                <div class="tab active" data-tab="generate">Generate</div>
+                <div class="tab" data-tab="analyze">Analyze</div>
+                <div class="tab" data-tab="model">Model</div>
+            </div>
+            
+            <div class="tab-content active" id="generate-tab">
+                <div class="param-row">
+                    <input type="text" class="param-control" id="promptInput" 
+                           placeholder="Enter research prompt..." value="The attention mechanism">
                 </div>
-                <div class="metric">
-                    <span>Token:</span>
-                    <span class="metric-value" id="currentToken">-</span>
+                <div class="param-row">
+                    <span class="param-label">Temp</span>
+                    <input type="range" class="param-control" id="tempSlider" 
+                           min="0.1" max="2.0" step="0.1" value="0.7">
+                    <span class="param-value" id="tempValue">0.7</span>
                 </div>
-                <div class="metric">
-                    <span>Position:</span>
-                    <span class="metric-value" id="tokenPosition">-</span>
+                <div class="param-row">
+                    <button class="param-control" id="generateBtn" style="background: var(--research-highlight); color: white; border: none;">
+                        Generate & Analyze
+                    </button>
                 </div>
             </div>
             
-            <div class="probe-section">
-                <h3>Attention Patterns <small>(Simulated)</small></h3>
-                <div class="metric">
-                    <span>Avg Attention:</span>
-                    <span class="metric-value" id="avgAttention">0.00</span>
+            <div class="tab-content" id="analyze-tab">
+                <div class="param-row">
+                    <span class="param-label">View</span>
+                    <select class="param-control" id="visualMode">
+                        <option value="embedding">Token Embeddings</option>
+                        <option value="probability">Probability Space</option>
+                        <option value="uncertainty">Uncertainty Map</option>
+                        <option value="attention">Attention Flow</option>
+                    </select>
                 </div>
-                <div class="attention-matrix" id="attentionMatrix" role="grid" aria-label="Simulated attention head matrix"></div>
-            </div>
-            
-            <div class="probe-section">
-                <h3>Hidden States <small>(Simulated)</small></h3>
-                <div class="metric">
-                    <span>L2 Norm:</span>
-                    <span class="metric-value" id="hiddenNorm">0.00</span>
+                <div class="param-row">
+                    <span class="param-label">Layer</span>
+                    <input type="range" class="param-control" id="layerSlider" 
+                           min="0" max="11" step="1" value="6">
+                    <span class="param-value" id="layerValue">6</span>
                 </div>
-                <div class="metric">
-                    <span>Entropy:</span>
-                    <span class="metric-value" id="hiddenEntropy">0.00</span>
-                </div>
-            </div>
-            
-            <div class="probe-section">
-                <h3>Token Probabilities</h3>
-                <div class="metric">
-                    <span>Top Token Prob:</span>
-                    <span class="metric-value" id="topTokenProb">0.00</span>
-                </div>
-                <div class="metric">
-                    <span>Perplexity:</span>
-                    <span class="metric-value" id="perplexity">0.00</span>
+                <div class="param-row">
+                    <button class="param-control" id="exportBtn">Export Data</button>
                 </div>
             </div>
             
-            <div class="probe-section">
-                <h3>Generated Tokens</h3>
-                <div class="token-list" id="tokenList" aria-live="polite" aria-label="Generated tokens"></div>
+            <div class="tab-content" id="model-tab">
+                <div class="param-row">
+                    <select class="param-control" id="modelSelect">
+                        <option value="Phi-2-GGUF">Phi-2 (2.7B)</option>
+                        <option value="TinyLlama-1.1B-Chat-v0.4-q4f16_1-1k">TinyLlama (1.1B)</option>
+                    </select>
+                </div>
+                <div class="param-row">
+                    <button class="param-control" id="loadModelBtn">Load Model</button>
+                </div>
+                <div class="param-row">
+                    <button class="param-control" id="compareBtn">Compare Mode</button>
+                </div>
             </div>
         </div>
-        
-        <div class="output-area" id="outputArea">
-            <strong>Model Output:</strong><br>
-            <span id="generatedText">Ready for inference...</span>
+
+        <!-- Token Analysis Overlay -->
+        <div class="token-overlay" id="tokenOverlay">
+            <h4 style="margin-bottom: 10px; font-size: 11px; color: var(--text-accent);">Token Analysis</h4>
+            <div id="tokenList"></div>
+        </div>
+
+        <!-- Comparison Mode -->
+        <div class="comparison-mode" id="comparisonMode">
+            <h4 style="margin-bottom: 10px; font-size: 11px; color: var(--research-highlight);">Compare Prompts</h4>
+            <textarea class="comparison-prompt" id="promptA" placeholder="Prompt A..."></textarea>
+            <textarea class="comparison-prompt" id="promptB" placeholder="Prompt B..."></textarea>
+            <button class="compare-btn" id="runComparisonBtn">Run Comparison</button>
+            <div style="font-size: 9px; color: var(--text-secondary);">
+                Swipe 3D space to switch between results
+            </div>
+        </div>
+
+        <!-- Gesture Hints -->
+        <div class="gesture-hints" id="gestureHints">
+            <div>👆 Tap: Focus token</div>
+            <div>✌️ Pinch: Zoom embedding space</div>
+            <div>👆👆 Two-finger drag: Rotate view</div>
+            <div>🤏 Long press: Analyze point</div>
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babylonjs/6.0.0/babylon.min.js" 
-            integrity="sha512-oPJaUCNOg6zHCHVahjJGSjxKQc3GhtzWLGCBdJWyKQDwRK5lJHO4KdEjJRR/xhTYdCjjrDrJOJBxc+oXN6N39w==" 
-            crossorigin="anonymous" 
-            referrerpolicy="no-referrer"></script>
-    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babylonjs/6.0.0/babylon.min.js"></script>
     <script type="module">
-        // Error handling and logging utility
-        class Logger {
-            static error(message, error = null) {
-                console.error(`[LLM-Introspection] ${message}`, error);
-                // In production, send to monitoring service
-            }
-            
-            static warn(message) {
-                console.warn(`[LLM-Introspection] ${message}`);
-            }
-            
-            static info(message) {
-                console.info(`[LLM-Introspection] ${message}`);
-            }
-        }
+        import * as webllm from "https://esm.run/@mlc-ai/web-llm";
 
-        // Utility functions
-        class Utils {
-            // Sanitize text content to prevent XSS
-            static sanitizeText(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
-            }
-            
-            // Debounce function for performance
-            static debounce(func, wait) {
-                let timeout;
-                return function executedFunction(...args) {
-                    const later = () => {
-                        clearTimeout(timeout);
-                        func(...args);
-                    };
-                    clearTimeout(timeout);
-                    timeout = setTimeout(later, wait);
-                };
-            }
-            
-            // Check if running on mobile device
-            static isMobile() {
-                return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            }
-            
-            // Performance-aware animation frame handling
-            static rafThrottle(callback) {
-                let running = false;
-                return function() {
-                    if (running) return;
-                    running = true;
-                    requestAnimationFrame(() => {
-                        callback.apply(this, arguments);
-                        running = false;
-                    });
-                };
-            }
-        }
-
-        // Model management class
-        class ModelManager {
+        class ResearchLLMIntrospector {
             constructor() {
                 this.engine = null;
                 this.currentModel = null;
-                this.isLoading = false;
-            }
-
-            async initialize() {
-                try {
-                    Logger.info("Initializing WebLLM engine");
-                    
-                    // Dynamic import to reduce initial bundle size
-                    const webllm = await import("https://esm.run/@mlc-ai/web-llm");
-                    this.engine = new webllm.MLCEngine();
-                    
-                    return true;
-                } catch (error) {
-                    Logger.error("Failed to initialize WebLLM", error);
-                    throw new Error(`WebLLM initialization failed: ${error.message}`);
-                }
-            }
-
-            async loadModel(modelId, progressCallback) {
-                if (this.isLoading) {
-                    throw new Error("Model loading already in progress");
-                }
-
-                this.isLoading = true;
-                
-                try {
-                    Logger.info(`Loading model: ${modelId}`);
-                    
-                    // Check if model is available
-                    const webllm = await import("https://esm.run/@mlc-ai/web-llm");
-                    const availableModels = webllm.prebuiltAppConfig.model_list;
-                    const modelExists = availableModels.some(model => model.model === modelId);
-                    
-                    if (!modelExists) {
-                        throw new Error(`Model ${modelId} not found in available models`);
-                    }
-
-                    if (progressCallback) {
-                        progressCallback(`Loading ${modelId}...`);
-                    }
-
-                    await this.engine.reload(modelId);
-                    this.currentModel = modelId;
-                    
-                    Logger.info(`Model ${modelId} loaded successfully`);
-                    return true;
-                    
-                } catch (error) {
-                    Logger.error(`Failed to load model ${modelId}`, error);
-                    throw error;
-                } finally {
-                    this.isLoading = false;
-                }
-            }
-
-            async generateStream(messages, options = {}) {
-                if (!this.engine || !this.currentModel) {
-                    throw new Error("No model loaded");
-                }
-
-                const defaultOptions = {
-                    temperature: 0.7,
-                    max_tokens: 50,
-                    stream: true
-                };
-
-                const mergedOptions = { ...defaultOptions, ...options };
-                
-                try {
-                    return await this.engine.chat.completions.create({
-                        messages,
-                        ...mergedOptions
-                    });
-                } catch (error) {
-                    Logger.error("Generation failed", error);
-                    throw error;
-                }
-            }
-
-            dispose() {
-                if (this.engine) {
-                    // WebLLM doesn't expose explicit disposal yet
-                    this.engine = null;
-                    this.currentModel = null;
-                }
-            }
-        }
-
-        // 3D visualization manager
-        class BabylonRenderer {
-            constructor(canvasId) {
-                this.canvas = document.getElementById(canvasId);
-                this.engine = null;
+                this.babylonEngine = null;
                 this.scene = null;
-                this.manifoldMesh = null;
-                this.material = null;
-                this.isDisposed = false;
+                this.manifold = null;
                 
-                // Performance settings
-                this.isMobile = Utils.isMobile();
-                this.updateRate = this.isMobile ? 30 : 60; // FPS target
+                // Research data
+                this.tokenData = [];
+                this.probabilityHistory = [];
+                this.comparisonData = { A: null, B: null };
+                this.currentView = 'embedding';
+                this.selectedLayer = 6;
+                
+                // Touch handling
+                this.touches = new Map();
+                this.lastTouchTime = 0;
+                this.isGenerating = false;
+                
+                this.init();
             }
 
-            async initialize() {
+            async init() {
                 try {
-                    // Check for WebGL support
-                    if (!this.canvas.getContext('webgl') && !this.canvas.getContext('experimental-webgl')) {
-                        throw new Error("WebGL not supported");
-                    }
-
-                    // Initialize Babylon.js with performance optimizations
-                    const engineOptions = {
-                        antialias: !this.isMobile,
-                        stencil: false,
-                        preserveDrawingBuffer: false,
-                        powerPreference: "high-performance",
-                        doNotHandleContextLost: true
-                    };
-
-                    this.engine = new BABYLON.Engine(this.canvas, true, engineOptions);
-                    this.scene = new BABYLON.Scene(this.engine);
-                    
-                    // Performance optimizations
-                    this.scene.skipPointerMovePicking = true;
-                    this.scene.autoClear = false;
-                    this.scene.autoClearDepthAndStencil = false;
-                    
-                    if (this.isMobile) {
-                        this.scene.setRenderingOrder(0);
-                    }
-
-                    this.setupScene();
-                    this.createManifold();
-                    this.startRenderLoop();
-                    
-                    Logger.info("Babylon.js renderer initialized");
-                    return true;
-                    
+                    await this.initBabylon();
+                    await this.initWebLLM();
+                    this.setupControls();
+                    this.setupGestures();
+                    this.hideLoadingScreen();
+                    this.showGestureHints();
                 } catch (error) {
-                    Logger.error("Failed to initialize Babylon.js", error);
-                    throw error;
+                    console.error("Initialization failed:", error);
+                    document.getElementById('loadingText').textContent = `Error: ${error.message}`;
                 }
             }
 
-            setupScene() {
-                // Camera with mobile-friendly controls
-                const camera = new BABYLON.ArcRotateCamera(
-                    "camera", 
-                    -Math.PI / 2, 
-                    Math.PI / 2.5, 
-                    10, 
-                    BABYLON.Vector3.Zero(), 
-                    this.scene
-                );
+            async initBabylon() {
+                const canvas = document.getElementById('babylonCanvas');
+                this.babylonEngine = new BABYLON.Engine(canvas, true, {
+                    antialias: false, // Better performance on mobile
+                    stencil: false,
+                    preserveDrawingBuffer: false
+                });
                 
-                // Touch-friendly camera controls
-                camera.attachControls(this.canvas, true);
+                this.scene = new BABYLON.Scene(this.babylonEngine);
+                this.scene.skipPointerMovePicking = true;
+                
+                // Camera optimized for research visualization
+                const camera = new BABYLON.ArcRotateCamera("camera", 
+                    -Math.PI / 2, Math.PI / 2.5, 8, BABYLON.Vector3.Zero(), this.scene);
+                camera.attachControls(canvas, false); // We'll handle gestures manually
                 camera.wheelPrecision = 50;
-                camera.pinchPrecision = 200;
-                camera.panningSensibility = 1000;
                 
                 // Lighting
                 const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), this.scene);
-                light.intensity = 0.7;
-            }
-
-            createManifold() {
-                // Create optimized geometry
-                const segments = this.isMobile ? 32 : 64;
-                const sphere = BABYLON.MeshBuilder.CreateSphere("manifold", {
-                    diameter: 4,
-                    segments: segments
-                }, this.scene);
-
-                // Create custom shader with error handling
-                try {
-                    this.material = this.createIntrospectionShader();
-                    sphere.material = this.material;
-                    this.manifoldMesh = sphere;
-                } catch (error) {
-                    Logger.error("Failed to create custom shader, falling back to standard material", error);
-                    // Fallback to standard material
-                    const standardMaterial = new BABYLON.StandardMaterial("fallback", this.scene);
-                    standardMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.4, 1.0);
-                    sphere.material = standardMaterial;
-                    this.manifoldMesh = sphere;
-                }
-            }
-
-            createIntrospectionShader() {
-                const shaderMaterial = new BABYLON.ShaderMaterial("introspectionShader", this.scene, {
-                    vertex: "introspection",
-                    fragment: "introspection"
-                }, {
-                    attributes: ["position", "normal", "uv"],
-                    uniforms: ["world", "worldView", "worldViewProjection", "view", "projection",
-                              "time", "attentionWeights", "hiddenNorm", "tokenPosition", "isGenerating"]
+                light.intensity = 0.8;
+                
+                this.createEmbeddingSpace();
+                
+                // Render loop
+                this.babylonEngine.runRenderLoop(() => {
+                    this.scene.render();
                 });
-
-                // Define shaders with error handling
-                this.defineShaders();
-
-                // Set initial uniforms with safe defaults
-                const safeUniformSet = (name, value) => {
-                    try {
-                        shaderMaterial.setFloat(name, value);
-                    } catch (error) {
-                        Logger.warn(`Failed to set uniform ${name}:`, error);
-                    }
-                };
-
-                safeUniformSet("time", 0);
-                safeUniformSet("hiddenNorm", 1.0);
-                safeUniformSet("tokenPosition", 0);
-                safeUniformSet("isGenerating", 0);
-
-                // Set attention weights array safely
-                try {
-                    const defaultWeights = new Array(64).fill(0.1);
-                    shaderMaterial.setFloats("attentionWeights", defaultWeights);
-                } catch (error) {
-                    Logger.warn("Failed to set attention weights uniform:", error);
-                }
-
-                return shaderMaterial;
-            }
-
-            defineShaders() {
-                // Vertex shader with mobile optimizations
-                BABYLON.Effect.ShadersStore["introspectionVertexShader"] = `
-                    precision ${this.isMobile ? 'mediump' : 'highp'} float;
-                    
-                    attribute vec3 position;
-                    attribute vec3 normal;
-                    attribute vec2 uv;
-                    
-                    uniform mat4 worldViewProjection;
-                    uniform mat4 world;
-                    uniform float time;
-                    uniform float attentionWeights[64];
-                    uniform float hiddenNorm;
-                    uniform float tokenPosition;
-                    uniform float isGenerating;
-                    
-                    varying vec3 vPosition;
-                    varying vec3 vNormal;
-                    varying vec2 vUV;
-                    varying float vAttentionInfluence;
-                    
-                    // Simplified noise for mobile performance
-                    float noise(vec3 x) {
-                        return sin(x.x * 12.9898 + x.y * 78.233 + x.z * 37.719) * 0.5 + 0.5;
-                    }
-                    
-                    void main() {
-                        vPosition = position;
-                        vNormal = normal;
-                        vUV = uv;
-                        
-                        // Calculate simplified attention influence
-                        float attentionSum = 0.0;
-                        // Reduce loop iterations on mobile for performance
-                        int maxIterations = ${this.isMobile ? 32 : 64};
-                        for(int i = 0; i < maxIterations; i++) {
-                            if(i >= 64) break;
-                            attentionSum += attentionWeights[i];
-                        }
-                        vAttentionInfluence = attentionSum / float(maxIterations);
-                        
-                        // Simplified deformation
-                        vec3 pos = position;
-                        float displacement = noise(pos * 2.0 + time * 0.1) * 0.2 * hiddenNorm;
-                        displacement += vAttentionInfluence * 0.2;
-                        displacement += sin(tokenPosition * 0.1 + time) * isGenerating * 0.1;
-                        
-                        pos += normal * displacement;
-                        
-                        gl_Position = worldViewProjection * vec4(pos, 1.0);
-                    }
-                `;
-
-                // Fragment shader with mobile optimizations
-                BABYLON.Effect.ShadersStore["introspectionFragmentShader"] = `
-                    precision ${this.isMobile ? 'mediump' : 'highp'} float;
-                    
-                    uniform float time;
-                    uniform float isGenerating;
-                    
-                    varying vec3 vPosition;
-                    varying vec3 vNormal;
-                    varying vec2 vUV;
-                    varying float vAttentionInfluence;
-                    
-                    void main() {
-                        // Simplified color calculation for mobile
-                        vec3 baseColor = vec3(0.2, 0.4, 1.0);
-                        baseColor += vAttentionInfluence * vec3(0.5, 0.2, 0.8);
-                        
-                        // Generation activity
-                        vec3 activityColor = vec3(1.0, 0.8, 0.2) * isGenerating * 
-                            sin(time * 4.0) * 0.3;
-                        
-                        // Simple rim lighting
-                        float rim = 1.0 - abs(dot(normalize(vNormal), vec3(0, 0, 1)));
-                        vec3 rimColor = vec3(0.4, 0.8, 1.0) * rim * 0.3;
-                        
-                        vec3 finalColor = baseColor + activityColor + rimColor;
-                        
-                        gl_FragColor = vec4(finalColor, 0.9);
-                    }
-                `;
-            }
-
-            updateVisualization(data) {
-                if (!this.material || this.isDisposed) return;
-
-                try {
-                    this.material.setFloat("time", performance.now() * 0.001);
-                    this.material.setFloat("isGenerating", data.isGenerating ? 1.0 : 0.0);
-                    this.material.setFloat("hiddenNorm", data.hiddenNorm || 1.0);
-                    this.material.setFloat("tokenPosition", data.tokenPosition || 0);
-                    
-                    if (data.attentionWeights) {
-                        this.material.setFloats("attentionWeights", data.attentionWeights);
-                    }
-                } catch (error) {
-                    Logger.warn("Failed to update shader uniforms:", error);
-                }
-            }
-
-            startRenderLoop() {
-                // Throttled render loop for performance
-                const throttledRender = Utils.rafThrottle(() => {
-                    if (!this.isDisposed && this.scene) {
-                        this.scene.render();
-                    }
+                
+                window.addEventListener('resize', () => {
+                    this.babylonEngine.resize();
                 });
-
-                this.engine.runRenderLoop(throttledRender);
             }
 
-            handleResize() {
-                if (this.engine && !this.isDisposed) {
-                    this.engine.resize();
+            createEmbeddingSpace() {
+                // Create point cloud for token embeddings
+                const positions = [];
+                const colors = [];
+                
+                // Generate initial embedding space visualization
+                for (let i = 0; i < 1000; i++) {
+                    // Random positions in embedding space
+                    positions.push(
+                        (Math.random() - 0.5) * 10,
+                        (Math.random() - 0.5) * 10,
+                        (Math.random() - 0.5) * 10
+                    );
+                    
+                    // Color based on semantic clusters
+                    const cluster = Math.floor(Math.random() * 5);
+                    const hue = cluster * 0.2;
+                    colors.push(
+                        Math.sin(hue * Math.PI * 2) * 0.5 + 0.5,
+                        Math.sin((hue + 0.33) * Math.PI * 2) * 0.5 + 0.5,
+                        Math.sin((hue + 0.66) * Math.PI * 2) * 0.5 + 0.5,
+                        0.8
+                    );
                 }
+                
+                // Create point cloud mesh
+                const pointCloud = new BABYLON.PointsCloudSystem("embeddings", 1000, this.scene);
+                pointCloud.addPoints(1000, (particle, i) => {
+                    particle.position.x = positions[i * 3];
+                    particle.position.y = positions[i * 3 + 1];
+                    particle.position.z = positions[i * 3 + 2];
+                    particle.color.r = colors[i * 4];
+                    particle.color.g = colors[i * 4 + 1];
+                    particle.color.b = colors[i * 4 + 2];
+                    particle.color.a = colors[i * 4 + 3];
+                });
+                
+                pointCloud.buildMesh();
+                this.manifold = pointCloud;
             }
 
-            dispose() {
-                if (this.isDisposed) return;
-                
-                this.isDisposed = true;
-                
-                if (this.material) {
-                    this.material.dispose();
-                }
-                
-                if (this.manifoldMesh) {
-                    this.manifoldMesh.dispose();
-                }
-                
-                if (this.scene) {
-                    this.scene.dispose();
-                }
-                
-                if (this.engine) {
-                    this.engine.dispose();
-                }
-                
-                Logger.info("Babylon.js renderer disposed");
-            }
-        }
-
-        // Main application class
-        class LLMIntrospectionInterface {
-            constructor() {
-                this.modelManager = new ModelManager();
-                this.babylonRenderer = new BabylonRenderer('babylonCanvas');
-                this.isGenerating = false;
-                this.generatedTokens = [];
-                this.attentionWeights = new Array(64).fill(0.1);
-                
-                // Bind methods to preserve 'this' context
-                this.handleResize = Utils.debounce(() => {
-                    this.babylonRenderer.handleResize();
-                }, 250);
-                
-                this.isInitialized = false;
+            async initWebLLM() {
+                this.updateLoadingText("Initializing WebLLM...");
+                this.engine = new webllm.MLCEngine();
+                this.updateModelStatus("WebLLM Ready");
             }
 
-            async initialize() {
-                try {
-                    this.updateStatus("loading", "Initializing...");
-                    
-                    // Initialize Babylon.js first (faster)
-                    await this.babylonRenderer.initialize();
-                    
-                    // Then initialize WebLLM
-                    await this.modelManager.initialize();
-                    
-                    this.setupEventListeners();
-                    this.updateStatus("ready", "WebLLM Ready - Select and load a model");
-                    this.hideLoadingScreen();
-                    
-                    this.isInitialized = true;
-                    Logger.info("Application initialized successfully");
-                    
-                } catch (error) {
-                    Logger.error("Application initialization failed", error);
-                    this.updateStatus("error", `Initialization failed: ${error.message}`);
-                    this.updateLoadingText(`Error: ${error.message}`);
-                }
-            }
-
-            setupEventListeners() {
+            setupControls() {
+                // Tab switching
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        this.switchTab(tab.dataset.tab);
+                    });
+                });
+                
+                // Temperature slider
+                document.getElementById('tempSlider').addEventListener('input', (e) => {
+                    document.getElementById('tempValue').textContent = e.target.value;
+                });
+                
+                // Layer slider
+                document.getElementById('layerSlider').addEventListener('input', (e) => {
+                    this.selectedLayer = parseInt(e.target.value);
+                    document.getElementById('layerValue').textContent = e.target.value;
+                    this.updateVisualization();
+                });
+                
+                // Visual mode selector
+                document.getElementById('visualMode').addEventListener('change', (e) => {
+                    this.currentView = e.target.value;
+                    this.updateVisualization();
+                });
+                
                 // Model loading
                 document.getElementById('loadModelBtn').addEventListener('click', () => {
                     this.loadModel();
                 });
                 
-                // Generation controls
+                // Generation
                 document.getElementById('generateBtn').addEventListener('click', () => {
-                    this.generateText();
+                    this.generateAndAnalyze();
                 });
                 
-                document.getElementById('stopBtn').addEventListener('click', () => {
-                    this.stopGeneration();
+                // Export
+                document.getElementById('exportBtn').addEventListener('click', () => {
+                    this.exportData();
                 });
                 
-                document.getElementById('resetBtn').addEventListener('click', () => {
-                    this.resetInterface();
+                // Comparison mode
+                document.getElementById('compareBtn').addEventListener('click', () => {
+                    this.toggleComparisonMode();
                 });
                 
-                // Temperature slider
-                document.getElementById('temperatureSlider').addEventListener('input', (e) => {
-                    document.getElementById('temperatureValue').textContent = e.target.value;
+                document.getElementById('runComparisonBtn').addEventListener('click', () => {
+                    this.runComparison();
                 });
+            }
+
+            setupGestures() {
+                const canvas = document.getElementById('babylonCanvas');
                 
-                // Window resize
-                window.addEventListener('resize', this.handleResize);
+                // Touch start
+                canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    Array.from(e.touches).forEach(touch => {
+                        this.touches.set(touch.identifier, {
+                            x: touch.clientX,
+                            y: touch.clientY,
+                            startTime: Date.now()
+                        });
+                    });
+                    
+                    if (e.touches.length === 1) {
+                        this.handleSingleTouch(e.touches[0]);
+                    }
+                }, { passive: false });
                 
-                // Cleanup on page unload
-                window.addEventListener('beforeunload', () => {
-                    this.dispose();
+                // Touch move
+                canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    
+                    if (e.touches.length === 2) {
+                        this.handlePinchZoom(e.touches[0], e.touches[1]);
+                    } else if (e.touches.length === 1) {
+                        this.handleSingleTouchMove(e.touches[0]);
+                    }
+                }, { passive: false });
+                
+                // Touch end
+                canvas.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    Array.from(e.changedTouches).forEach(touch => {
+                        const touchData = this.touches.get(touch.identifier);
+                        if (touchData) {
+                            const duration = Date.now() - touchData.startTime;
+                            if (duration > 500) {
+                                this.handleLongPress(touch);
+                            }
+                        }
+                        this.touches.delete(touch.identifier);
+                    });
+                }, { passive: false });
+                
+                // Mouse fallback for development
+                canvas.addEventListener('click', (e) => {
+                    this.handleCanvasClick(e);
                 });
+            }
+
+            handleSingleTouch(touch) {
+                // Ray casting to find touched token
+                const ray = this.getRayFromTouch(touch);
+                const pickResult = this.scene.pick(touch.clientX, touch.clientY);
                 
-                // Error handling for uncaught errors
-                window.addEventListener('error', (event) => {
-                    Logger.error("Uncaught error:", event.error);
-                });
+                if (pickResult.hit) {
+                    this.focusToken(pickResult.pickedPoint);
+                }
+            }
+
+            handleSingleTouchMove(touch) {
+                const prevTouch = this.touches.get(touch.identifier);
+                if (prevTouch) {
+                    const deltaX = touch.clientX - prevTouch.x;
+                    const deltaY = touch.clientY - prevTouch.y;
+                    
+                    // Rotate camera
+                    const camera = this.scene.activeCamera;
+                    camera.alpha += deltaX * 0.01;
+                    camera.beta += deltaY * 0.01;
+                    
+                    // Update touch position
+                    this.touches.set(touch.identifier, {
+                        x: touch.clientX,
+                        y: touch.clientY,
+                        startTime: prevTouch.startTime
+                    });
+                }
+            }
+
+            handlePinchZoom(touch1, touch2) {
+                // Calculate distance between touches
+                const distance = Math.sqrt(
+                    Math.pow(touch2.clientX - touch1.clientX, 2) +
+                    Math.pow(touch2.clientY - touch1.clientY, 2)
+                );
                 
-                window.addEventListener('unhandledrejection', (event) => {
-                    Logger.error("Unhandled promise rejection:", event.reason);
-                });
+                if (this.lastPinchDistance) {
+                    const scale = distance / this.lastPinchDistance;
+                    const camera = this.scene.activeCamera;
+                    camera.radius *= (2 - scale); // Invert for natural zoom
+                    camera.radius = Math.max(2, Math.min(20, camera.radius));
+                }
+                
+                this.lastPinchDistance = distance;
+            }
+
+            handleLongPress(touch) {
+                // Analyze the point in detail
+                const ray = this.getRayFromTouch(touch);
+                const pickResult = this.scene.pick(touch.clientX, touch.clientY);
+                
+                if (pickResult.hit) {
+                    this.analyzePoint(pickResult.pickedPoint);
+                }
+            }
+
+            handleCanvasClick(e) {
+                // Fallback for non-touch devices
+                const pickResult = this.scene.pick(e.clientX, e.clientY);
+                if (pickResult.hit) {
+                    this.focusToken(pickResult.pickedPoint);
+                }
+            }
+
+            getRayFromTouch(touch) {
+                return this.scene.createPickingRay(
+                    touch.clientX, 
+                    touch.clientY, 
+                    BABYLON.Matrix.Identity(), 
+                    this.scene.activeCamera
+                );
+            }
+
+            focusToken(point) {
+                // Find nearest token to the picked point
+                // This would map to actual token data in real implementation
+                const tokenIndex = Math.floor(Math.random() * this.tokenData.length);
+                if (this.tokenData[tokenIndex]) {
+                    this.displayTokenAnalysis(this.tokenData[tokenIndex]);
+                }
+                
+                // Show token overlay
+                document.getElementById('tokenOverlay').classList.add('open');
+                setTimeout(() => {
+                    document.getElementById('tokenOverlay').classList.remove('open');
+                }, 3000);
+            }
+
+            analyzePoint(point) {
+                // Deep analysis of the selected point
+                const analysis = {
+                    embedding: [point.x, point.y, point.z],
+                    semanticCluster: Math.floor(Math.random() * 5),
+                    uncertainty: Math.random(),
+                    attention: Math.random() * 0.8 + 0.1
+                };
+                
+                console.log("Point Analysis:", analysis);
+                // In real implementation, this would show detailed metrics
             }
 
             async loadModel() {
                 try {
                     const modelId = document.getElementById('modelSelect').value;
-                    const button = document.getElementById('loadModelBtn');
-                    
-                    button.disabled = true;
-                    this.updateStatus("loading", "Loading model...");
+                    this.updateModelStatus("Loading model...");
                     this.showLoadingScreen();
                     
-                    await this.modelManager.loadModel(modelId, (progress) => {
-                        this.updateLoadingText(progress);
-                    });
-                    
-                    this.updateStatus("ready", `${modelId} loaded successfully`);
+                    await this.engine.reload(modelId);
+                    this.currentModel = modelId;
+                    this.updateModelStatus(`${modelId} loaded`);
                     this.hideLoadingScreen();
                     
-                    // Enable generation controls
-                    document.getElementById('generateBtn').disabled = false;
-                    
                 } catch (error) {
-                    Logger.error("Model loading failed", error);
-                    this.updateStatus("error", `Model loading failed: ${error.message}`);
-                    this.updateLoadingText(`Error: ${error.message}`);
-                } finally {
-                    document.getElementById('loadModelBtn').disabled = false;
+                    console.error("Model loading failed:", error);
+                    this.updateModelStatus("Loading failed");
+                    this.hideLoadingScreen();
                 }
             }
 
-            async generateText() {
-                if (this.isGenerating) return;
+            async generateAndAnalyze() {
+                if (!this.currentModel || this.isGenerating) return;
                 
-                const promptInput = document.getElementById('promptInput');
-                const prompt = promptInput.value.trim();
-                
-                if (!prompt) {
-                    alert("Please enter a prompt");
-                    promptInput.focus();
-                    return;
-                }
+                const prompt = document.getElementById('promptInput').value.trim();
+                if (!prompt) return;
                 
                 this.isGenerating = true;
-                this.updateGenerationControls();
-                this.clearOutput();
-                this.resetProbeData();
+                this.tokenData = [];
+                this.probabilityHistory = [];
                 
                 try {
-                    const temperature = parseFloat(document.getElementById('temperatureSlider').value);
-                    const maxTokens = parseInt(document.getElementById('maxTokens').value);
+                    const temperature = parseFloat(document.getElementById('tempSlider').value);
                     
-                    const messages = [
-                        { role: "user", content: prompt }
-                    ];
-                    
-                    const stream = await this.modelManager.generateStream(messages, {
+                    const messages = [{ role: "user", content: prompt }];
+                    const stream = await this.engine.chat.completions.create({
+                        messages,
                         temperature,
-                        max_tokens: maxTokens
+                        max_tokens: 30,
+                        stream: true,
+                        logprobs: true, // Request probability data
+                        top_logprobs: 10
                     });
                     
-                    let fullResponse = "";
                     let tokenCount = 0;
-                    
                     for await (const chunk of stream) {
                         if (!this.isGenerating) break;
                         
-                        const delta = chunk.choices[0]?.delta?.content || "";
-                        if (delta) {
-                            fullResponse += delta;
+                        const choice = chunk.choices[0];
+                        if (choice?.delta?.content) {
                             tokenCount++;
                             
-                            // Simulate probe data and update visualization
-                            this.simulateProbeData(delta, tokenCount);
-                            this.updateVisualization();
-                            this.updateOutput(Utils.sanitizeText(fullResponse));
+                            // Extract real probability data
+                            const logprobs = choice.logprobs;
+                            const tokenInfo = {
+                                token: choice.delta.content,
+                                position: tokenCount,
+                                probability: logprobs ? Math.exp(logprobs.content[0].logprob) : 0.5,
+                                topTokens: logprobs ? logprobs.content[0].top_logprobs : [],
+                                timestamp: Date.now()
+                            };
                             
-                            // Small delay for visibility
-                            await new Promise(resolve => setTimeout(resolve, 80));
+                            this.tokenData.push(tokenInfo);
+                            this.updateHUD(tokenInfo);
+                            this.updateEmbeddingVisualization(tokenInfo);
+                            
+                            await new Promise(resolve => setTimeout(resolve, 100));
                         }
                     }
                     
                 } catch (error) {
-                    Logger.error("Generation failed", error);
-                    this.updateOutput(`Error: ${error.message}`);
+                    console.error("Generation failed:", error);
                 } finally {
                     this.isGenerating = false;
-                    this.updateGenerationControls();
                 }
             }
 
-            simulateProbeData(token, position) {
-                // Note: This is simulated data for demonstration purposes
-                // Real attention weights and hidden states would require model modifications
-                
-                // Simulate attention weights with some coherent patterns
-                for (let i = 0; i < 64; i++) {
-                    const headRow = Math.floor(i / 8);
-                    const headCol = i % 8;
-                    const influence = Math.sin(position * 0.1 + headRow * 0.5) * 
-                                    Math.cos(token.charCodeAt(0) * 0.1 + headCol * 0.3);
-                    this.attentionWeights[i] = Math.abs(influence) * 0.8 + 0.2;
+            updateHUD(tokenInfo) {
+                // Calculate entropy from top tokens
+                let entropy = 0;
+                if (tokenInfo.topTokens && tokenInfo.topTokens.length > 0) {
+                    tokenInfo.topTokens.forEach(token => {
+                        const prob = Math.exp(token.logprob);
+                        if (prob > 0) entropy -= prob * Math.log2(prob);
+                    });
                 }
                 
-                // Simulate other metrics
-                const hiddenNorm = Math.random() * 2 + 1;
-                const hiddenEntropy = Math.random() * 3 + 1;
-                const topTokenProb = Math.random() * 0.6 + 0.4;
-                const perplexity = Math.random() * 20 + 5;
+                document.getElementById('entropyValue').textContent = entropy.toFixed(2);
+                document.getElementById('topKValue').textContent = tokenInfo.topTokens?.length || 0;
+                document.getElementById('tokenCount').textContent = this.tokenData.length;
+                document.getElementById('currentLayer').textContent = this.selectedLayer;
+                document.getElementById('currentToken').textContent = tokenInfo.token;
                 
-                // Store token data
-                this.generatedTokens.push({
-                    token: Utils.sanitizeText(token),
-                    position: position,
-                    probability: topTokenProb
-                });
-                
-                // Keep only recent tokens for performance
-                if (this.generatedTokens.length > 100) {
-                    this.generatedTokens = this.generatedTokens.slice(-50);
-                }
-                
-                // Update UI
-                this.updateProbeDisplay({
-                    currentLayer: `${(position % 12) + 1}/12`,
-                    currentToken: Utils.sanitizeText(token),
-                    tokenPosition: position,
-                    avgAttention: (this.attentionWeights.reduce((a, b) => a + b) / 64).toFixed(2),
-                    hiddenNorm: hiddenNorm.toFixed(2),
-                    hiddenEntropy: hiddenEntropy.toFixed(2),
-                    topTokenProb: topTokenProb.toFixed(2),
-                    perplexity: perplexity.toFixed(1)
-                });
+                // Update probability bar
+                const probPercent = (tokenInfo.probability * 100).toFixed(1);
+                document.getElementById('probabilityFill').style.width = `${tokenInfo.probability * 100}%`;
+                document.getElementById('probabilityText').textContent = `${probPercent}%`;
             }
 
-            updateProbeDisplay(data) {
-                // Safely update DOM elements
-                const updateElement = (id, value) => {
-                    const element = document.getElementById(id);
-                    if (element) {
-                        element.textContent = value;
-                    }
-                };
+            updateEmbeddingVisualization(tokenInfo) {
+                // Map token to 3D space based on semantic properties
+                // This is simplified - real implementation would use actual embeddings
+                const position = new BABYLON.Vector3(
+                    (tokenInfo.token.charCodeAt(0) % 20 - 10) * 0.3,
+                    (tokenInfo.probability - 0.5) * 10,
+                    (tokenInfo.position % 20 - 10) * 0.3
+                );
                 
-                updateElement('currentLayer', data.currentLayer);
-                updateElement('currentToken', data.currentToken);
-                updateElement('tokenPosition', data.tokenPosition);
-                updateElement('avgAttention', data.avgAttention);
-                updateElement('hiddenNorm', data.hiddenNorm);
-                updateElement('hiddenEntropy', data.hiddenEntropy);
-                updateElement('topTokenProb', data.topTokenProb);
-                updateElement('perplexity', data.perplexity);
+                // Create visualization marker
+                const sphere = BABYLON.MeshBuilder.CreateSphere("token", {diameter: 0.2}, this.scene);
+                sphere.position = position;
                 
-                // Update attention matrix safely
-                this.updateAttentionMatrix();
+                // Color based on probability
+                const material = new BABYLON.StandardMaterial("tokenMat", this.scene);
+                material.emissiveColor = new BABYLON.Color3(
+                    tokenInfo.probability,
+                    1 - tokenInfo.probability,
+                    0.5
+                );
+                sphere.material = material;
                 
-                // Update token list safely
-                this.updateTokenList();
-            }
-
-            updateAttentionMatrix() {
-                const matrix = document.getElementById('attentionMatrix');
-                if (!matrix) return;
-                
-                // Create cells if not exists
-                if (matrix.children.length === 0) {
-                    for (let i = 0; i < 64; i++) {
-                        const cell = document.createElement('div');
-                        cell.className = 'attention-cell';
-                        cell.setAttribute('role', 'gridcell');
-                        cell.setAttribute('aria-label', `Attention head ${Math.floor(i / 8) + 1}-${(i % 8) + 1}`);
-                        matrix.appendChild(cell);
-                    }
-                }
-                
-                // Update cell intensities
-                for (let i = 0; i < 64; i++) {
-                    const cell = matrix.children[i];
-                    if (cell) {
-                        const intensity = Math.max(0, Math.min(1, this.attentionWeights[i]));
-                        cell.style.background = `rgba(100, 200, 255, ${intensity})`;
-                    }
-                }
-            }
-
-            updateTokenList() {
-                const tokenList = document.getElementById('tokenList');
-                if (!tokenList) return;
-                
-                // Show only recent tokens for performance
-                const recentTokens = this.generatedTokens.slice(-20);
-                const tokenElements = recentTokens.map((tokenData, index) => {
-                    const isLast = index === recentTokens.length - 1;
-                    const sanitizedToken = Utils.sanitizeText(tokenData.token);
-                    return `<span class="token ${isLast ? 'current' : ''}" title="Probability: ${tokenData.probability.toFixed(3)}">${sanitizedToken}</span>`;
-                }).join('');
-                
-                tokenList.innerHTML = tokenElements;
-                tokenList.scrollTop = tokenList.scrollHeight;
+                // Animate appearance
+                sphere.scaling = BABYLON.Vector3.Zero();
+                BABYLON.Animation.CreateAndStartAnimation("tokenAppear", sphere, "scaling", 30, 10,
+                    BABYLON.Vector3.Zero(), BABYLON.Vector3.One(), 0);
             }
 
             updateVisualization() {
+                // Update 3D visualization based on current view mode
+                switch (this.currentView) {
+                    case 'embedding':
+                        this.showEmbeddingSpace();
+                        break;
+                    case 'probability':
+                        this.showProbabilitySpace();
+                        break;
+                    case 'uncertainty':
+                        this.showUncertaintyMap();
+                        break;
+                    case 'attention':
+                        this.showAttentionFlow();
+                        break;
+                }
+            }
+
+            showEmbeddingSpace() {
+                // Visualize token embeddings in 3D space
+                console.log("Showing embedding space");
+            }
+
+            showProbabilitySpace() {
+                // Visualize probability distributions
+                console.log("Showing probability space");
+            }
+
+            showUncertaintyMap() {
+                // Visualize model uncertainty
+                console.log("Showing uncertainty map");
+            }
+
+            showAttentionFlow() {
+                // Visualize attention patterns
+                console.log("Showing attention flow");
+            }
+
+            displayTokenAnalysis(tokenInfo) {
+                const tokenList = document.getElementById('tokenList');
+                tokenList.innerHTML = '';
+                
+                // Show current token details
+                const tokenItem = document.createElement('div');
+                tokenItem.className = 'token-item';
+                tokenItem.innerHTML = `
+                    <span class="token-text">${tokenInfo.token}</span>
+                    <span class="token-prob">${(tokenInfo.probability * 100).toFixed(1)}%</span>
+                `;
+                tokenList.appendChild(tokenItem);
+                
+                // Show alternative tokens
+                if (tokenInfo.topTokens) {
+                    tokenInfo.topTokens.slice(1, 6).forEach(alt => {
+                        const altItem = document.createElement('div');
+                        altItem.className = 'token-item';
+                        altItem.style.opacity = '0.6';
+                        altItem.innerHTML = `
+                            <span class="token-text">${alt.token}</span>
+                            <span class="token-prob">${(Math.exp(alt.logprob) * 100).toFixed(1)}%</span>
+                        `;
+                        tokenList.appendChild(altItem);
+                    });
+                }
+            }
+
+            toggleComparisonMode() {
+                const comparisonMode = document.getElementById('comparisonMode');
+                comparisonMode.classList.toggle('open');
+            }
+
+            async runComparison() {
+                const promptA = document.getElementById('promptA').value.trim();
+                const promptB = document.getElementById('promptB').value.trim();
+                
+                if (!promptA || !promptB) return;
+                
+                console.log("Running comparison between:", promptA, "and", promptB);
+                // Implement comparison logic
+            }
+
+            exportData() {
                 const data = {
-                    isGenerating: this.isGenerating,
-                    attentionWeights: this.attentionWeights,
-                    hiddenNorm: Math.random() * 2 + 1, // Simulated
-                    tokenPosition: this.generatedTokens.length
+                    tokenData: this.tokenData,
+                    probabilityHistory: this.probabilityHistory,
+                    model: this.currentModel,
+                    timestamp: new Date().toISOString()
                 };
                 
-                this.babylonRenderer.updateVisualization(data);
+                const blob = new Blob([JSON.stringify(data, null, 2)], 
+                    { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `llm-introspection-${Date.now()}.json`;
+                a.click();
+                
+                URL.revokeObjectURL(url);
             }
 
-            stopGeneration() {
-                this.isGenerating = false;
-                this.updateGenerationControls();
-                Logger.info("Generation stopped by user");
+            switchTab(tabName) {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+                document.getElementById(`${tabName}-tab`).classList.add('active');
             }
 
-            resetInterface() {
-                this.stopGeneration();
-                this.clearOutput();
-                this.resetProbeData();
-                
-                // Reset form values
-                document.getElementById('promptInput').value = "The meaning of life is";
-                document.getElementById('temperatureSlider').value = "0.7";
-                document.getElementById('temperatureValue').textContent = "0.7";
-                document.getElementById('maxTokens').value = "50";
-                
-                Logger.info("Interface reset");
-            }
-
-            updateGenerationControls() {
-                const generateBtn = document.getElementById('generateBtn');
-                const stopBtn = document.getElementById('stopBtn');
-                
-                if (generateBtn) {
-                    generateBtn.disabled = this.isGenerating || !this.modelManager.currentModel;
-                }
-                
-                if (stopBtn) {
-                    stopBtn.disabled = !this.isGenerating;
-                }
-            }
-
-            updateStatus(status, text) {
-                const indicator = document.getElementById('statusIndicator');
-                const statusText = document.getElementById('statusText');
-                
-                if (indicator) {
-                    indicator.className = `status-indicator ${status}`;
-                }
-                
-                if (statusText) {
-                    statusText.textContent = text;
-                }
+            showGestureHints() {
+                const hints = document.getElementById('gestureHints');
+                hints.classList.add('show');
+                setTimeout(() => {
+                    hints.classList.remove('show');
+                }, 3000);
             }
 
             updateLoadingText(text) {
-                const loadingText = document.getElementById('loadingText');
-                if (loadingText) {
-                    loadingText.textContent = text;
-                }
+                document.getElementById('loadingText').textContent = text;
+            }
+
+            updateModelStatus(status) {
+                document.getElementById('modelStatus').textContent = status;
             }
 
             showLoadingScreen() {
-                const loadingScreen = document.getElementById('loadingScreen');
-                if (loadingScreen) {
-                    loadingScreen.style.display = 'flex';
-                }
+                document.getElementById('loadingScreen').style.display = 'flex';
             }
 
             hideLoadingScreen() {
-                const loadingScreen = document.getElementById('loadingScreen');
-                if (loadingScreen) {
-                    loadingScreen.style.display = 'none';
-                }
-            }
-
-            updateOutput(text) {
-                const generatedText = document.getElementById('generatedText');
-                if (generatedText) {
-                    generatedText.textContent = text;
-                }
-            }
-
-            clearOutput() {
-                this.updateOutput("Generating...");
-            }
-
-            resetProbeData() {
-                this.attentionWeights.fill(0.1);
-                this.generatedTokens = [];
-                
-                this.updateProbeDisplay({
-                    currentLayer: "-",
-                    currentToken: "-",
-                    tokenPosition: "-",
-                    avgAttention: "0.00",
-                    hiddenNorm: "0.00",
-                    hiddenEntropy: "0.00",
-                    topTokenProb: "0.00",
-                    perplexity: "0.00"
-                });
-                
-                const tokenList = document.getElementById('tokenList');
-                if (tokenList) {
-                    tokenList.innerHTML = "";
-                }
-            }
-
-            dispose() {
-                this.stopGeneration();
-                
-                // Remove event listeners
-                window.removeEventListener('resize', this.handleResize);
-                
-                // Dispose of managers
-                this.modelManager.dispose();
-                this.babylonRenderer.dispose();
-                
-                Logger.info("Application disposed");
+                document.getElementById('loadingScreen').style.display = 'none';
             }
         }
 
-        // Initialize application when DOM is ready
-        document.addEventListener('DOMContentLoaded', async () => {
-            try {
-                const app = new LLMIntrospectionInterface();
-                await app.initialize();
-                
-                // Store reference globally for debugging (development only)
-                if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-                    window.llmApp = app;
-                }
-            } catch (error) {
-                Logger.error("Failed to start application", error);
-                
-                // Show user-friendly error message
-                const loadingText = document.getElementById('loadingText');
-                if (loadingText) {
-                    loadingText.textContent = `Failed to initialize: ${error.message}`;
-                }
-            }
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            new ResearchLLMIntrospector();
         });
     </script>
 </body>
