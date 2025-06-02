@@ -3,19 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="description" content="Research-grade LLM introspection with real probe data">
-    <title>LLM Research Introspector</title>
+    <meta name="description" content="Research-grade LLM introspection with intuitive interface">
+    <title>LLM Research Explorer</title>
     
     <style>
         :root {
-            --bg-primary: #0a0a0f;
-            --bg-secondary: rgba(5, 5, 15, 0.95);
-            --border-primary: rgba(100, 200, 255, 0.4);
-            --border-accent: rgba(255, 180, 100, 0.4);
-            --text-primary: #e8e8e8;
-            --text-secondary: #a8a8a8;
-            --text-accent: #88ffaa;
-            --research-highlight: #ff6b6b;
+            --bg-primary: #0f0f1a;
+            --bg-secondary: rgba(15, 15, 25, 0.95);
+            --bg-card: rgba(25, 25, 35, 0.9);
+            --border-primary: rgba(120, 180, 255, 0.3);
+            --border-accent: rgba(255, 150, 80, 0.4);
+            --text-primary: #f0f0f0;
+            --text-secondary: #b0b0b0;
+            --text-accent: #88ccff;
+            --text-highlight: #ffaa66;
+            --success: #66dd88;
+            --warning: #ffcc66;
+            --error: #ff6b88;
+            --font-primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
             --font-mono: 'SF Mono', 'Monaco', 'Menlo', monospace;
         }
 
@@ -27,316 +32,493 @@
 
         body {
             background: var(--bg-primary);
+            font-family: var(--font-primary);
+            color: var(--text-primary);
             overflow: hidden;
             height: 100vh;
-            font-family: var(--font-mono);
-            color: var(--text-primary);
-            touch-action: none;
-            user-select: none;
+            touch-action: manipulation;
+            -webkit-text-size-adjust: 100%;
         }
 
         #container {
             width: 100vw;
             height: 100vh;
+            display: grid;
+            grid-template-areas: 
+                "main-header main-header"
+                "visualization controls"
+                "results results";
+            grid-template-rows: auto 1fr auto;
+            grid-template-columns: 1fr 300px;
+            gap: 10px;
+            padding: 10px;
+        }
+
+        /* Mobile layout */
+        @media (max-width: 768px) {
+            #container {
+                grid-template-areas: 
+                    "main-header"
+                    "controls"
+                    "visualization"
+                    "results";
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto 1fr auto;
+                padding: 5px;
+                gap: 5px;
+            }
+        }
+
+        /* Main Header - Model Status & Quick Actions */
+        .main-header {
+            grid-area: main-header;
+            background: var(--bg-card);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            backdrop-filter: blur(20px);
+        }
+
+        .model-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--error);
+            transition: background 0.3s ease;
+        }
+
+        .status-dot.loading {
+            background: var(--warning);
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-dot.ready {
+            background: var(--success);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .model-info h2 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .model-info p {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 10px 16px;
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: rgba(120, 180, 255, 0.1);
+            border-color: var(--border-accent);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn.primary {
+            background: var(--text-accent);
+            color: var(--bg-primary);
+            border-color: var(--text-accent);
+        }
+
+        .btn.primary:hover:not(:disabled) {
+            background: #66aaee;
+        }
+
+        /* Visualization Area */
+        .visualization-area {
+            grid-area: visualization;
+            background: var(--bg-card);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
             position: relative;
+            overflow: hidden;
+            min-height: 400px;
         }
 
         #babylonCanvas {
             width: 100%;
             height: 100%;
             display: block;
-            outline: none;
             touch-action: none;
         }
 
-        /* Research-focused HUD overlay */
-        .research-hud {
+        .viz-overlay {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
-            height: 120px;
-            background: var(--bg-secondary);
+            top: 16px;
+            left: 16px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+            pointer-events: none;
+        }
+
+        .viz-help {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            right: 16px;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 11px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .visualization-area:hover .viz-help {
+            opacity: 1;
+        }
+
+        /* Control Panel */
+        .control-panel {
+            grid-area: controls;
+            background: var(--bg-card);
             border: 1px solid var(--border-primary);
             border-radius: 12px;
-            padding: 12px;
-            backdrop-filter: blur(15px);
-            z-index: 100;
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .panel-header h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .panel-header p {
             font-size: 11px;
-        }
-
-        .hud-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .hud-metric {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-width: 60px;
-        }
-
-        .hud-label {
             color: var(--text-secondary);
-            font-size: 9px;
+            margin: 0;
+        }
+
+        .panel-content {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
-        .hud-value {
-            color: var(--text-accent);
-            font-weight: bold;
-            font-size: 12px;
-        }
-
-        .probability-bar {
+        .form-input {
             width: 100%;
-            height: 20px;
+            padding: 10px 12px;
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
             background: rgba(0, 0, 0, 0.3);
-            border-radius: 10px;
-            overflow: hidden;
-            position: relative;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 13px;
+            transition: border-color 0.2s ease;
         }
 
-        .probability-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--research-highlight), var(--text-accent));
-            border-radius: 10px;
-            transition: width 0.3s ease;
+        .form-input:focus {
+            outline: none;
+            border-color: var(--text-accent);
+            box-shadow: 0 0 0 2px rgba(136, 204, 255, 0.2);
         }
 
-        .probability-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 10px;
-            font-weight: bold;
-            color: white;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+        .form-textarea {
+            min-height: 80px;
+            resize: vertical;
+            font-family: var(--font-mono);
+            line-height: 1.4;
         }
 
-        /* Bottom control panel for research parameters */
-        .research-controls {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            right: 10px;
-            height: 140px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-accent);
+        .slider-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .slider {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--text-accent);
+            cursor: pointer;
+            border: 2px solid var(--bg-primary);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--text-accent);
+            cursor: pointer;
+            border: 2px solid var(--bg-primary);
+        }
+
+        .slider-value {
+            min-width: 40px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-accent);
+        }
+
+        /* Results Panel */
+        .results-panel {
+            grid-area: results;
+            background: var(--bg-card);
+            border: 1px solid var(--border-primary);
             border-radius: 12px;
-            padding: 12px;
-            backdrop-filter: blur(15px);
-            z-index: 100;
             display: flex;
             flex-direction: column;
+            max-height: 200px;
         }
 
-        .control-tabs {
+        .results-tabs {
             display: flex;
-            margin-bottom: 10px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .tab {
             flex: 1;
-            padding: 8px;
-            text-align: center;
-            font-size: 10px;
-            text-transform: uppercase;
+            padding: 12px 16px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 500;
             cursor: pointer;
-            border-bottom: 2px solid transparent;
             transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .tab.active {
-            border-bottom-color: var(--border-accent);
             color: var(--text-accent);
+            background: rgba(136, 204, 255, 0.1);
+            border-bottom: 2px solid var(--text-accent);
+        }
+
+        .tab:hover:not(.active) {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
         }
 
         .tab-content {
-            display: none;
             flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: none;
         }
 
         .tab-content.active {
-            display: flex;
-            flex-direction: column;
+            display: block;
         }
 
-        .param-row {
-            display: flex;
-            align-items: center;
-            margin-bottom: 8px;
-            gap: 10px;
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
         }
 
-        .param-label {
-            min-width: 80px;
+        .metric-card {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-accent);
+            margin-bottom: 4px;
+        }
+
+        .metric-label {
             font-size: 10px;
             color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .param-control {
-            flex: 1;
-            height: 32px;
-            background: rgba(20, 20, 30, 0.8);
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            color: var(--text-primary);
-            font-family: inherit;
-            font-size: 11px;
-            padding: 4px 8px;
-        }
-
-        .param-value {
-            min-width: 40px;
-            font-size: 10px;
-            color: var(--text-accent);
-            text-align: center;
-        }
-
-        /* Gesture indicators */
-        .gesture-hints {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: rgba(255, 255, 255, 0.3);
-            font-size: 12px;
-            text-align: center;
-            pointer-events: none;
-            z-index: 50;
-            opacity: 0;
-            transition: opacity 0.5s ease;
-        }
-
-        .gesture-hints.show {
-            opacity: 1;
-        }
-
-        /* Token analysis overlay */
-        .token-overlay {
-            position: absolute;
-            top: 140px;
-            right: 10px;
-            width: 200px;
-            max-height: calc(100vh - 300px);
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: 12px;
-            padding: 12px;
-            backdrop-filter: blur(15px);
-            z-index: 90;
-            overflow-y: auto;
-            transform: translateX(220px);
-            transition: transform 0.3s ease;
-        }
-
-        .token-overlay.open {
-            transform: translateX(0);
-        }
-
-        .token-item {
+        .token-stream {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px;
-            margin-bottom: 4px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 6px;
-            font-size: 10px;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-bottom: 12px;
         }
 
-        .token-text {
-            max-width: 120px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .token-prob {
+        .token {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            background: rgba(136, 204, 255, 0.1);
             color: var(--text-accent);
-            font-weight: bold;
-        }
-
-        /* Comparison mode */
-        .comparison-mode {
-            position: absolute;
-            top: 140px;
-            left: 10px;
-            width: 180px;
-            height: 200px;
-            background: var(--bg-secondary);
-            border: 1px solid var(--research-highlight);
-            border-radius: 12px;
-            padding: 12px;
-            backdrop-filter: blur(15px);
-            z-index: 90;
-            transform: translateX(-200px);
-            transition: transform 0.3s ease;
-        }
-
-        .comparison-mode.open {
-            transform: translateX(0);
-        }
-
-        .comparison-prompt {
-            width: 100%;
-            height: 60px;
-            background: rgba(20, 20, 30, 0.8);
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            color: var(--text-primary);
-            font-family: inherit;
-            font-size: 10px;
-            padding: 6px;
-            resize: none;
-            margin-bottom: 8px;
-        }
-
-        .compare-btn {
-            width: 100%;
-            height: 32px;
-            background: var(--research-highlight);
-            border: none;
-            border-radius: 6px;
-            color: white;
-            font-family: inherit;
-            font-size: 10px;
+            border: 1px solid rgba(136, 204, 255, 0.2);
+            position: relative;
             cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .token:hover {
+            background: rgba(136, 204, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .token.uncertain {
+            background: rgba(255, 204, 102, 0.1);
+            color: var(--warning);
+            border-color: rgba(255, 204, 102, 0.3);
+        }
+
+        .token.current {
+            background: var(--text-accent);
+            color: var(--bg-primary);
+            font-weight: 600;
+        }
+
+        .generation-output {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            line-height: 1.5;
+            min-height: 60px;
+            color: var(--text-primary);
+        }
+
+        .comparison-view {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .comparison-item {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 12px;
+        }
+
+        .comparison-item h4 {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .comparison-item .output {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            line-height: 1.4;
             margin-bottom: 8px;
         }
 
+        .comparison-metrics {
+            display: flex;
+            gap: 12px;
+            font-size: 10px;
+        }
+
+        .comparison-metrics span {
+            color: var(--text-accent);
+        }
+
+        /* Loading States */
         .loading-screen {
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(15, 15, 26, 0.95);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            z-index: 200;
-            color: var(--text-primary);
+            z-index: 1000;
+            backdrop-filter: blur(20px);
         }
 
         .loading-spinner {
-            width: 30px;
-            height: 30px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
+            width: 40px;
+            height: 40px;
+            border: 2px solid rgba(136, 204, 255, 0.2);
             border-top: 2px solid var(--text-accent);
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
 
         @keyframes spin {
@@ -344,253 +526,372 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* iPhone-specific optimizations */
-        @media (max-width: 414px) and (orientation: portrait) {
-            .research-hud {
-                height: 100px;
-                font-size: 10px;
+        .loading-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .loading-details {
+            color: var(--text-secondary);
+            font-size: 11px;
+            opacity: 0.7;
+        }
+
+        /* Mobile Optimizations */
+        @media (max-width: 768px) {
+            .main-header {
+                padding: 12px;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
             }
-            
-            .research-controls {
-                height: 120px;
+
+            .model-status {
+                justify-content: center;
             }
-            
-            .token-overlay {
-                width: 160px;
+
+            .quick-actions {
+                justify-content: center;
+                flex-wrap: wrap;
             }
-            
-            .comparison-mode {
-                width: 150px;
-                height: 180px;
+
+            .control-panel {
+                max-height: 300px;
+            }
+
+            .results-panel {
+                max-height: 250px;
+            }
+
+            .btn {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .comparison-view {
+                grid-template-columns: 1fr;
+            }
+
+            .metrics-grid {
+                grid-template-columns: repeat(3, 1fr);
             }
         }
 
-        @media (orientation: landscape) {
-            .research-hud {
-                top: 5px;
-                height: 80px;
-                left: 200px;
-                right: 200px;
+        /* Accessibility */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
             }
-            
-            .research-controls {
-                bottom: 5px;
-                height: 100px;
-                left: 200px;
-                right: 200px;
+        }
+
+        /* High contrast mode */
+        @media (prefers-contrast: high) {
+            :root {
+                --bg-primary: #000000;
+                --bg-card: #1a1a1a;
+                --border-primary: #ffffff;
+                --text-primary: #ffffff;
             }
-            
-            .token-overlay {
-                top: 5px;
-                right: 5px;
-                max-height: calc(100vh - 120px);
-            }
-            
-            .comparison-mode {
-                top: 5px;
-                left: 5px;
-                height: calc(100vh - 120px);
-            }
+        }
+
+        /* Tooltips */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            z-index: 1000;
+        }
+
+        .tooltip:hover::after {
+            opacity: 1;
+        }
+
+        .help-icon {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+            color: var(--bg-primary);
+            font-size: 10px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 14px;
+            margin-left: 4px;
+            cursor: help;
         }
     </style>
 </head>
 <body>
     <div id="container">
-        <canvas id="babylonCanvas" aria-label="3D LLM introspection space"></canvas>
-        
-        <div class="loading-screen" id="loadingScreen">
-            <div class="loading-spinner"></div>
-            <div id="loadingText">Initializing WebLLM...</div>
-        </div>
-        
-        <!-- Research HUD -->
-        <div class="research-hud">
-            <div class="hud-row">
-                <div class="hud-metric">
-                    <div class="hud-label">Entropy</div>
-                    <div class="hud-value" id="entropyValue">0.00</div>
-                </div>
-                <div class="hud-metric">
-                    <div class="hud-label">Top-K</div>
-                    <div class="hud-value" id="topKValue">5</div>
-                </div>
-                <div class="hud-metric">
-                    <div class="hud-label">Tokens</div>
-                    <div class="hud-value" id="tokenCount">0</div>
-                </div>
-                <div class="hud-metric">
-                    <div class="hud-label">Layer</div>
-                    <div class="hud-value" id="currentLayer">-</div>
+        <!-- Main Header -->
+        <header class="main-header">
+            <div class="model-status">
+                <div class="status-dot" id="statusDot" aria-label="Connection status"></div>
+                <div class="model-info">
+                    <h2 id="modelName">No Model Loaded</h2>
+                    <p id="modelDetails">Select and load a model to begin</p>
                 </div>
             </div>
-            <div class="hud-row">
-                <div style="flex: 1;">
-                    <div class="hud-label">Next Token Probability</div>
-                    <div class="probability-bar">
-                        <div class="probability-fill" id="probabilityFill" style="width: 0%"></div>
-                        <div class="probability-text" id="probabilityText">-</div>
+            <div class="quick-actions">
+                <button class="btn" id="loadModelBtn">
+                    <span>🔄</span> Load Model
+                </button>
+                <button class="btn primary" id="generateBtn" disabled>
+                    <span>✨</span> Generate
+                </button>
+                <button class="btn" id="compareBtn">
+                    <span>⚖️</span> Compare
+                </button>
+                <button class="btn" id="exportBtn">
+                    <span>💾</span> Export
+                </button>
+            </div>
+        </header>
+
+        <!-- Visualization Area -->
+        <main class="visualization-area">
+            <canvas id="babylonCanvas" aria-label="Interactive 3D visualization of token embeddings"></canvas>
+            <div class="viz-overlay" id="vizOverlay">
+                <div>View: <span id="currentView">Token Embeddings</span></div>
+                <div>Layer: <span id="currentLayer">6</span>/12</div>
+                <div>Tokens: <span id="tokenCount">0</span></div>
+            </div>
+            <div class="viz-help">
+                <strong>Touch:</strong> Tap tokens to analyze • Pinch to zoom • Two fingers to rotate
+            </div>
+        </main>
+
+        <!-- Control Panel -->
+        <aside class="control-panel">
+            <div class="panel-header">
+                <h3>Experiment Controls</h3>
+                <p>Configure your research parameters</p>
+            </div>
+            <div class="panel-content">
+                <div class="form-group">
+                    <label class="form-label" for="promptInput">
+                        Research Prompt
+                        <span class="help-icon tooltip" data-tooltip="Enter the text you want the model to continue">?</span>
+                    </label>
+                    <textarea 
+                        class="form-input form-textarea" 
+                        id="promptInput" 
+                        placeholder="The neural network's attention mechanism..."
+                        value="The neural network's attention mechanism">The neural network's attention mechanism</textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="modelSelect">Model Selection</label>
+                    <select class="form-input" id="modelSelect">
+                        <option value="">Select a model...</option>
+                        <option value="Phi-2-GGUF">Phi-2 (2.7B) - Balanced</option>
+                        <option value="TinyLlama-1.1B-Chat-v0.4-q4f16_1-1k">TinyLlama (1.1B) - Fast</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        Temperature: Creativity Control
+                        <span class="help-icon tooltip" data-tooltip="Higher = more creative, Lower = more focused">?</span>
+                    </label>
+                    <div class="slider-group">
+                        <input type="range" class="slider" id="tempSlider" 
+                               min="0.1" max="2.0" step="0.1" value="0.7">
+                        <span class="slider-value" id="tempValue">0.7</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Visualization Layer</label>
+                    <div class="slider-group">
+                        <input type="range" class="slider" id="layerSlider" 
+                               min="0" max="11" step="1" value="6">
+                        <span class="slider-value" id="layerValue">6</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="maxTokens">Max Tokens</label>
+                    <input type="number" class="form-input" id="maxTokens" 
+                           min="5" max="100" value="25" placeholder="25">
+                </div>
+            </div>
+        </aside>
+
+        <!-- Results Panel -->
+        <section class="results-panel">
+            <div class="results-tabs">
+                <button class="tab active" data-tab="live">Live Analysis</button>
+                <button class="tab" data-tab="sequence">Token Sequence</button>
+                <button class="tab" data-tab="comparison">Comparison</button>
+                <button class="tab" data-tab="export">Export</button>
+            </div>
+
+            <div class="tab-content active" id="live-content">
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value" id="entropyValue">0.00</div>
+                        <div class="metric-label">Entropy</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="confidenceValue">0%</div>
+                        <div class="metric-label">Confidence</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="uncertaintyValue">Low</div>
+                        <div class="metric-label">Uncertainty</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="surpriseValue">0.0</div>
+                        <div class="metric-label">Surprise</div>
+                    </div>
+                </div>
+                <div class="generation-output" id="liveOutput">
+                    Ready to generate. Click the Generate button to start analyzing.
+                </div>
+            </div>
+
+            <div class="tab-content" id="sequence-content">
+                <div class="token-stream" id="tokenStream"></div>
+                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 8px;">
+                    Click tokens to see alternatives • <span class="token uncertain">Yellow</span> = high uncertainty
+                </div>
+            </div>
+
+            <div class="tab-content" id="comparison-content">
+                <div class="comparison-view" id="comparisonView">
+                    <div class="comparison-item">
+                        <h4>Prompt A</h4>
+                        <div class="output">No comparison data yet</div>
+                        <div class="comparison-metrics">
+                            Avg Confidence: <span>-</span> | Entropy: <span>-</span>
+                        </div>
+                    </div>
+                    <div class="comparison-item">
+                        <h4>Prompt B</h4>
+                        <div class="output">Run a comparison to see results</div>
+                        <div class="comparison-metrics">
+                            Avg Confidence: <span>-</span> | Entropy: <span>-</span>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="hud-row">
-                <div style="flex: 1; font-size: 10px; color: var(--text-secondary);">
-                    <span id="currentToken">Ready</span> • <span id="modelStatus">No model loaded</span>
-                </div>
-            </div>
-        </div>
 
-        <!-- Research Controls -->
-        <div class="research-controls">
-            <div class="control-tabs">
-                <div class="tab active" data-tab="generate">Generate</div>
-                <div class="tab" data-tab="analyze">Analyze</div>
-                <div class="tab" data-tab="model">Model</div>
-            </div>
-            
-            <div class="tab-content active" id="generate-tab">
-                <div class="param-row">
-                    <input type="text" class="param-control" id="promptInput" 
-                           placeholder="Enter research prompt..." value="The attention mechanism">
-                </div>
-                <div class="param-row">
-                    <span class="param-label">Temp</span>
-                    <input type="range" class="param-control" id="tempSlider" 
-                           min="0.1" max="2.0" step="0.1" value="0.7">
-                    <span class="param-value" id="tempValue">0.7</span>
-                </div>
-                <div class="param-row">
-                    <button class="param-control" id="generateBtn" style="background: var(--research-highlight); color: white; border: none;">
-                        Generate & Analyze
-                    </button>
+            <div class="tab-content" id="export-content">
+                <div style="font-size: 12px; line-height: 1.5; color: var(--text-secondary);">
+                    <p style="margin-bottom: 12px;"><strong>Export includes:</strong></p>
+                    <ul style="margin-left: 16px; margin-bottom: 16px;">
+                        <li>Token probabilities and alternatives</li>
+                        <li>Entropy and uncertainty metrics</li>
+                        <li>Model parameters and settings</li>
+                        <li>Visualization data points</li>
+                    </ul>
+                    <button class="btn primary" id="doExportBtn">Download Research Data (JSON)</button>
                 </div>
             </div>
-            
-            <div class="tab-content" id="analyze-tab">
-                <div class="param-row">
-                    <span class="param-label">View</span>
-                    <select class="param-control" id="visualMode">
-                        <option value="embedding">Token Embeddings</option>
-                        <option value="probability">Probability Space</option>
-                        <option value="uncertainty">Uncertainty Map</option>
-                        <option value="attention">Attention Flow</option>
-                    </select>
-                </div>
-                <div class="param-row">
-                    <span class="param-label">Layer</span>
-                    <input type="range" class="param-control" id="layerSlider" 
-                           min="0" max="11" step="1" value="6">
-                    <span class="param-value" id="layerValue">6</span>
-                </div>
-                <div class="param-row">
-                    <button class="param-control" id="exportBtn">Export Data</button>
-                </div>
-            </div>
-            
-            <div class="tab-content" id="model-tab">
-                <div class="param-row">
-                    <select class="param-control" id="modelSelect">
-                        <option value="Phi-2-GGUF">Phi-2 (2.7B)</option>
-                        <option value="TinyLlama-1.1B-Chat-v0.4-q4f16_1-1k">TinyLlama (1.1B)</option>
-                    </select>
-                </div>
-                <div class="param-row">
-                    <button class="param-control" id="loadModelBtn">Load Model</button>
-                </div>
-                <div class="param-row">
-                    <button class="param-control" id="compareBtn">Compare Mode</button>
-                </div>
-            </div>
-        </div>
+        </section>
+    </div>
 
-        <!-- Token Analysis Overlay -->
-        <div class="token-overlay" id="tokenOverlay">
-            <h4 style="margin-bottom: 10px; font-size: 11px; color: var(--text-accent);">Token Analysis</h4>
-            <div id="tokenList"></div>
-        </div>
-
-        <!-- Comparison Mode -->
-        <div class="comparison-mode" id="comparisonMode">
-            <h4 style="margin-bottom: 10px; font-size: 11px; color: var(--research-highlight);">Compare Prompts</h4>
-            <textarea class="comparison-prompt" id="promptA" placeholder="Prompt A..."></textarea>
-            <textarea class="comparison-prompt" id="promptB" placeholder="Prompt B..."></textarea>
-            <button class="compare-btn" id="runComparisonBtn">Run Comparison</button>
-            <div style="font-size: 9px; color: var(--text-secondary);">
-                Swipe 3D space to switch between results
-            </div>
-        </div>
-
-        <!-- Gesture Hints -->
-        <div class="gesture-hints" id="gestureHints">
-            <div>👆 Tap: Focus token</div>
-            <div>✌️ Pinch: Zoom embedding space</div>
-            <div>👆👆 Two-finger drag: Rotate view</div>
-            <div>🤏 Long press: Analyze point</div>
-        </div>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loadingText">Initializing WebLLM...</div>
+        <div class="loading-details" id="loadingDetails">This may take a moment on first load</div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babylonjs/6.0.0/babylon.min.js"></script>
     <script type="module">
         import * as webllm from "https://esm.run/@mlc-ai/web-llm";
 
-        class ResearchLLMIntrospector {
+        class LLMResearchExplorer {
             constructor() {
                 this.engine = null;
                 this.currentModel = null;
                 this.babylonEngine = null;
                 this.scene = null;
-                this.manifold = null;
-                
-                // Research data
-                this.tokenData = [];
-                this.probabilityHistory = [];
-                this.comparisonData = { A: null, B: null };
-                this.currentView = 'embedding';
-                this.selectedLayer = 6;
-                
-                // Touch handling
-                this.touches = new Map();
-                this.lastTouchTime = 0;
+                this.camera = null;
                 this.isGenerating = false;
+                this.tokenData = [];
+                this.comparisonData = { A: null, B: null };
+                this.currentTab = 'live';
                 
                 this.init();
             }
 
             async init() {
                 try {
+                    this.updateLoadingText('Initializing 3D visualization...');
                     await this.initBabylon();
+                    
+                    this.updateLoadingText('Loading WebLLM engine...');
                     await this.initWebLLM();
-                    this.setupControls();
-                    this.setupGestures();
+                    
+                    this.setupEventListeners();
                     this.hideLoadingScreen();
-                    this.showGestureHints();
+                    this.updateModelStatus('ready', 'WebLLM Ready', 'Select a model to begin research');
+                    
                 } catch (error) {
-                    console.error("Initialization failed:", error);
-                    document.getElementById('loadingText').textContent = `Error: ${error.message}`;
+                    console.error('Initialization failed:', error);
+                    this.updateLoadingText(`Error: ${error.message}`, 'Please refresh the page');
                 }
             }
 
             async initBabylon() {
                 const canvas = document.getElementById('babylonCanvas');
                 this.babylonEngine = new BABYLON.Engine(canvas, true, {
-                    antialias: false, // Better performance on mobile
+                    antialias: true,
                     stencil: false,
                     preserveDrawingBuffer: false
                 });
                 
                 this.scene = new BABYLON.Scene(this.babylonEngine);
-                this.scene.skipPointerMovePicking = true;
                 
-                // Camera optimized for research visualization
-                const camera = new BABYLON.ArcRotateCamera("camera", 
+                // Camera
+                this.camera = new BABYLON.ArcRotateCamera("camera", 
                     -Math.PI / 2, Math.PI / 2.5, 8, BABYLON.Vector3.Zero(), this.scene);
-                camera.attachControls(canvas, false); // We'll handle gestures manually
-                camera.wheelPrecision = 50;
+                this.camera.attachControls(canvas, true);
+                this.camera.wheelPrecision = 50;
                 
                 // Lighting
-                const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), this.scene);
+                const light = new BABYLON.HemisphericLight("light", 
+                    new BABYLON.Vector3(0, 1, 0), this.scene);
                 light.intensity = 0.8;
                 
-                this.createEmbeddingSpace();
+                // Create initial embedding space
+                this.createEmbeddingVisualization();
                 
                 // Render loop
                 this.babylonEngine.runRenderLoop(() => {
@@ -602,34 +903,23 @@
                 });
             }
 
-            createEmbeddingSpace() {
-                // Create point cloud for token embeddings
+            createEmbeddingVisualization() {
+                // Create a simple point cloud for now
                 const positions = [];
                 const colors = [];
                 
-                // Generate initial embedding space visualization
-                for (let i = 0; i < 1000; i++) {
-                    // Random positions in embedding space
+                for (let i = 0; i < 200; i++) {
                     positions.push(
-                        (Math.random() - 0.5) * 10,
-                        (Math.random() - 0.5) * 10,
-                        (Math.random() - 0.5) * 10
+                        (Math.random() - 0.5) * 8,
+                        (Math.random() - 0.5) * 8,
+                        (Math.random() - 0.5) * 8
                     );
                     
-                    // Color based on semantic clusters
-                    const cluster = Math.floor(Math.random() * 5);
-                    const hue = cluster * 0.2;
-                    colors.push(
-                        Math.sin(hue * Math.PI * 2) * 0.5 + 0.5,
-                        Math.sin((hue + 0.33) * Math.PI * 2) * 0.5 + 0.5,
-                        Math.sin((hue + 0.66) * Math.PI * 2) * 0.5 + 0.5,
-                        0.8
-                    );
+                    colors.push(0.5, 0.7, 1.0, 0.6);
                 }
                 
-                // Create point cloud mesh
-                const pointCloud = new BABYLON.PointsCloudSystem("embeddings", 1000, this.scene);
-                pointCloud.addPoints(1000, (particle, i) => {
+                const pointCloud = new BABYLON.PointsCloudSystem("embeddings", 200, this.scene);
+                pointCloud.addPoints(200, (particle, i) => {
                     particle.position.x = positions[i * 3];
                     particle.position.y = positions[i * 3 + 1];
                     particle.position.z = positions[i * 3 + 2];
@@ -640,430 +930,285 @@
                 });
                 
                 pointCloud.buildMesh();
-                this.manifold = pointCloud;
             }
 
             async initWebLLM() {
-                this.updateLoadingText("Initializing WebLLM...");
                 this.engine = new webllm.MLCEngine();
-                this.updateModelStatus("WebLLM Ready");
             }
 
-            setupControls() {
+            setupEventListeners() {
+                // Model loading
+                document.getElementById('loadModelBtn').addEventListener('click', () => {
+                    this.loadModel();
+                });
+
+                // Generation
+                document.getElementById('generateBtn').addEventListener('click', () => {
+                    this.generateText();
+                });
+
                 // Tab switching
                 document.querySelectorAll('.tab').forEach(tab => {
                     tab.addEventListener('click', () => {
                         this.switchTab(tab.dataset.tab);
                     });
                 });
-                
-                // Temperature slider
+
+                // Sliders
                 document.getElementById('tempSlider').addEventListener('input', (e) => {
                     document.getElementById('tempValue').textContent = e.target.value;
                 });
-                
-                // Layer slider
+
                 document.getElementById('layerSlider').addEventListener('input', (e) => {
-                    this.selectedLayer = parseInt(e.target.value);
                     document.getElementById('layerValue').textContent = e.target.value;
-                    this.updateVisualization();
+                    document.getElementById('currentLayer').textContent = e.target.value;
                 });
-                
-                // Visual mode selector
-                document.getElementById('visualMode').addEventListener('change', (e) => {
-                    this.currentView = e.target.value;
-                    this.updateVisualization();
-                });
-                
-                // Model loading
-                document.getElementById('loadModelBtn').addEventListener('click', () => {
-                    this.loadModel();
-                });
-                
-                // Generation
-                document.getElementById('generateBtn').addEventListener('click', () => {
-                    this.generateAndAnalyze();
-                });
-                
+
                 // Export
                 document.getElementById('exportBtn').addEventListener('click', () => {
+                    this.switchTab('export');
+                });
+
+                document.getElementById('doExportBtn').addEventListener('click', () => {
                     this.exportData();
                 });
-                
-                // Comparison mode
+
+                // Comparison
                 document.getElementById('compareBtn').addEventListener('click', () => {
-                    this.toggleComparisonMode();
+                    this.switchTab('comparison');
                 });
-                
-                document.getElementById('runComparisonBtn').addEventListener('click', () => {
-                    this.runComparison();
-                });
-            }
-
-            setupGestures() {
-                const canvas = document.getElementById('babylonCanvas');
-                
-                // Touch start
-                canvas.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    Array.from(e.touches).forEach(touch => {
-                        this.touches.set(touch.identifier, {
-                            x: touch.clientX,
-                            y: touch.clientY,
-                            startTime: Date.now()
-                        });
-                    });
-                    
-                    if (e.touches.length === 1) {
-                        this.handleSingleTouch(e.touches[0]);
-                    }
-                }, { passive: false });
-                
-                // Touch move
-                canvas.addEventListener('touchmove', (e) => {
-                    e.preventDefault();
-                    
-                    if (e.touches.length === 2) {
-                        this.handlePinchZoom(e.touches[0], e.touches[1]);
-                    } else if (e.touches.length === 1) {
-                        this.handleSingleTouchMove(e.touches[0]);
-                    }
-                }, { passive: false });
-                
-                // Touch end
-                canvas.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    Array.from(e.changedTouches).forEach(touch => {
-                        const touchData = this.touches.get(touch.identifier);
-                        if (touchData) {
-                            const duration = Date.now() - touchData.startTime;
-                            if (duration > 500) {
-                                this.handleLongPress(touch);
-                            }
-                        }
-                        this.touches.delete(touch.identifier);
-                    });
-                }, { passive: false });
-                
-                // Mouse fallback for development
-                canvas.addEventListener('click', (e) => {
-                    this.handleCanvasClick(e);
-                });
-            }
-
-            handleSingleTouch(touch) {
-                // Ray casting to find touched token
-                const ray = this.getRayFromTouch(touch);
-                const pickResult = this.scene.pick(touch.clientX, touch.clientY);
-                
-                if (pickResult.hit) {
-                    this.focusToken(pickResult.pickedPoint);
-                }
-            }
-
-            handleSingleTouchMove(touch) {
-                const prevTouch = this.touches.get(touch.identifier);
-                if (prevTouch) {
-                    const deltaX = touch.clientX - prevTouch.x;
-                    const deltaY = touch.clientY - prevTouch.y;
-                    
-                    // Rotate camera
-                    const camera = this.scene.activeCamera;
-                    camera.alpha += deltaX * 0.01;
-                    camera.beta += deltaY * 0.01;
-                    
-                    // Update touch position
-                    this.touches.set(touch.identifier, {
-                        x: touch.clientX,
-                        y: touch.clientY,
-                        startTime: prevTouch.startTime
-                    });
-                }
-            }
-
-            handlePinchZoom(touch1, touch2) {
-                // Calculate distance between touches
-                const distance = Math.sqrt(
-                    Math.pow(touch2.clientX - touch1.clientX, 2) +
-                    Math.pow(touch2.clientY - touch1.clientY, 2)
-                );
-                
-                if (this.lastPinchDistance) {
-                    const scale = distance / this.lastPinchDistance;
-                    const camera = this.scene.activeCamera;
-                    camera.radius *= (2 - scale); // Invert for natural zoom
-                    camera.radius = Math.max(2, Math.min(20, camera.radius));
-                }
-                
-                this.lastPinchDistance = distance;
-            }
-
-            handleLongPress(touch) {
-                // Analyze the point in detail
-                const ray = this.getRayFromTouch(touch);
-                const pickResult = this.scene.pick(touch.clientX, touch.clientY);
-                
-                if (pickResult.hit) {
-                    this.analyzePoint(pickResult.pickedPoint);
-                }
-            }
-
-            handleCanvasClick(e) {
-                // Fallback for non-touch devices
-                const pickResult = this.scene.pick(e.clientX, e.clientY);
-                if (pickResult.hit) {
-                    this.focusToken(pickResult.pickedPoint);
-                }
-            }
-
-            getRayFromTouch(touch) {
-                return this.scene.createPickingRay(
-                    touch.clientX, 
-                    touch.clientY, 
-                    BABYLON.Matrix.Identity(), 
-                    this.scene.activeCamera
-                );
-            }
-
-            focusToken(point) {
-                // Find nearest token to the picked point
-                // This would map to actual token data in real implementation
-                const tokenIndex = Math.floor(Math.random() * this.tokenData.length);
-                if (this.tokenData[tokenIndex]) {
-                    this.displayTokenAnalysis(this.tokenData[tokenIndex]);
-                }
-                
-                // Show token overlay
-                document.getElementById('tokenOverlay').classList.add('open');
-                setTimeout(() => {
-                    document.getElementById('tokenOverlay').classList.remove('open');
-                }, 3000);
-            }
-
-            analyzePoint(point) {
-                // Deep analysis of the selected point
-                const analysis = {
-                    embedding: [point.x, point.y, point.z],
-                    semanticCluster: Math.floor(Math.random() * 5),
-                    uncertainty: Math.random(),
-                    attention: Math.random() * 0.8 + 0.1
-                };
-                
-                console.log("Point Analysis:", analysis);
-                // In real implementation, this would show detailed metrics
             }
 
             async loadModel() {
                 try {
                     const modelId = document.getElementById('modelSelect').value;
-                    this.updateModelStatus("Loading model...");
+                    if (!modelId) {
+                        alert('Please select a model first');
+                        return;
+                    }
+
+                    this.updateModelStatus('loading', 'Loading Model...', 'This may take a few minutes');
                     this.showLoadingScreen();
                     
                     await this.engine.reload(modelId);
                     this.currentModel = modelId;
-                    this.updateModelStatus(`${modelId} loaded`);
+                    
+                    this.updateModelStatus('ready', modelId, 'Ready for text generation');
                     this.hideLoadingScreen();
                     
+                    // Enable generate button
+                    document.getElementById('generateBtn').disabled = false;
+                    
                 } catch (error) {
-                    console.error("Model loading failed:", error);
-                    this.updateModelStatus("Loading failed");
+                    console.error('Model loading failed:', error);
+                    this.updateModelStatus('error', 'Loading Failed', error.message);
                     this.hideLoadingScreen();
                 }
             }
 
-            async generateAndAnalyze() {
+            async generateText() {
                 if (!this.currentModel || this.isGenerating) return;
                 
                 const prompt = document.getElementById('promptInput').value.trim();
-                if (!prompt) return;
-                
+                if (!prompt) {
+                    alert('Please enter a prompt');
+                    return;
+                }
+
                 this.isGenerating = true;
                 this.tokenData = [];
-                this.probabilityHistory = [];
+                this.updateGenerationUI(true);
                 
                 try {
                     const temperature = parseFloat(document.getElementById('tempSlider').value);
+                    const maxTokens = parseInt(document.getElementById('maxTokens').value);
                     
                     const messages = [{ role: "user", content: prompt }];
                     const stream = await this.engine.chat.completions.create({
                         messages,
                         temperature,
-                        max_tokens: 30,
+                        max_tokens: maxTokens,
                         stream: true,
-                        logprobs: true, // Request probability data
-                        top_logprobs: 10
+                        logprobs: true,
+                        top_logprobs: 5
                     });
-                    
+
+                    let fullOutput = "";
                     let tokenCount = 0;
+
                     for await (const chunk of stream) {
                         if (!this.isGenerating) break;
                         
                         const choice = chunk.choices[0];
                         if (choice?.delta?.content) {
+                            const token = choice.delta.content;
+                            fullOutput += token;
                             tokenCount++;
                             
-                            // Extract real probability data
-                            const logprobs = choice.logprobs;
-                            const tokenInfo = {
-                                token: choice.delta.content,
-                                position: tokenCount,
-                                probability: logprobs ? Math.exp(logprobs.content[0].logprob) : 0.5,
-                                topTokens: logprobs ? logprobs.content[0].top_logprobs : [],
-                                timestamp: Date.now()
-                            };
-                            
+                            const tokenInfo = this.processTokenData(choice, tokenCount);
                             this.tokenData.push(tokenInfo);
-                            this.updateHUD(tokenInfo);
-                            this.updateEmbeddingVisualization(tokenInfo);
                             
-                            await new Promise(resolve => setTimeout(resolve, 100));
+                            this.updateLiveAnalysis(tokenInfo, fullOutput);
+                            this.updateTokenSequence();
+                            this.visualizeToken(tokenInfo);
+                            
+                            await new Promise(resolve => setTimeout(resolve, 150));
                         }
                     }
                     
                 } catch (error) {
-                    console.error("Generation failed:", error);
+                    console.error('Generation failed:', error);
+                    document.getElementById('liveOutput').textContent = `Error: ${error.message}`;
                 } finally {
                     this.isGenerating = false;
+                    this.updateGenerationUI(false);
                 }
             }
 
-            updateHUD(tokenInfo) {
-                // Calculate entropy from top tokens
+            processTokenData(choice, position) {
+                const logprobs = choice.logprobs;
+                const probability = logprobs ? Math.exp(logprobs.content[0].logprob) : 0.5;
+                
                 let entropy = 0;
-                if (tokenInfo.topTokens && tokenInfo.topTokens.length > 0) {
-                    tokenInfo.topTokens.forEach(token => {
+                if (logprobs?.content[0]?.top_logprobs) {
+                    for (const token of logprobs.content[0].top_logprobs) {
                         const prob = Math.exp(token.logprob);
                         if (prob > 0) entropy -= prob * Math.log2(prob);
-                    });
+                    }
                 }
-                
-                document.getElementById('entropyValue').textContent = entropy.toFixed(2);
-                document.getElementById('topKValue').textContent = tokenInfo.topTokens?.length || 0;
-                document.getElementById('tokenCount').textContent = this.tokenData.length;
-                document.getElementById('currentLayer').textContent = this.selectedLayer;
-                document.getElementById('currentToken').textContent = tokenInfo.token;
-                
-                // Update probability bar
-                const probPercent = (tokenInfo.probability * 100).toFixed(1);
-                document.getElementById('probabilityFill').style.width = `${tokenInfo.probability * 100}%`;
-                document.getElementById('probabilityText').textContent = `${probPercent}%`;
+
+                const uncertainty = entropy > 2.5 ? 'High' : entropy > 1.5 ? 'Medium' : 'Low';
+                const surprise = -Math.log2(probability);
+
+                return {
+                    token: choice.delta.content,
+                    position,
+                    probability,
+                    entropy,
+                    uncertainty,
+                    surprise,
+                    alternatives: logprobs?.content[0]?.top_logprobs || [],
+                    timestamp: Date.now()
+                };
             }
 
-            updateEmbeddingVisualization(tokenInfo) {
-                // Map token to 3D space based on semantic properties
-                // This is simplified - real implementation would use actual embeddings
-                const position = new BABYLON.Vector3(
-                    (tokenInfo.token.charCodeAt(0) % 20 - 10) * 0.3,
-                    (tokenInfo.probability - 0.5) * 10,
-                    (tokenInfo.position % 20 - 10) * 0.3
-                );
+            updateLiveAnalysis(tokenInfo, fullOutput) {
+                document.getElementById('entropyValue').textContent = tokenInfo.entropy.toFixed(2);
+                document.getElementById('confidenceValue').textContent = `${(tokenInfo.probability * 100).toFixed(1)}%`;
+                document.getElementById('uncertaintyValue').textContent = tokenInfo.uncertainty;
+                document.getElementById('surpriseValue').textContent = tokenInfo.surprise.toFixed(1);
+                document.getElementById('liveOutput').textContent = fullOutput;
+                document.getElementById('tokenCount').textContent = tokenInfo.position;
+            }
+
+            updateTokenSequence() {
+                const tokenStream = document.getElementById('tokenStream');
+                tokenStream.innerHTML = '';
                 
-                // Create visualization marker
-                const sphere = BABYLON.MeshBuilder.CreateSphere("token", {diameter: 0.2}, this.scene);
-                sphere.position = position;
+                this.tokenData.slice(-20).forEach((tokenData, index) => {
+                    const tokenEl = document.createElement('span');
+                    tokenEl.className = 'token';
+                    tokenEl.textContent = tokenData.token;
+                    
+                    if (tokenData.uncertainty === 'High') {
+                        tokenEl.classList.add('uncertain');
+                    }
+                    
+                    if (index === this.tokenData.length - 1) {
+                        tokenEl.classList.add('current');
+                    }
+                    
+                    tokenEl.addEventListener('click', () => {
+                        this.showTokenDetails(tokenData);
+                    });
+                    
+                    tokenStream.appendChild(tokenEl);
+                });
+            }
+
+            showTokenDetails(tokenData) {
+                const details = tokenData.alternatives.slice(0, 3).map(alt => 
+                    `${alt.token}: ${(Math.exp(alt.logprob) * 100).toFixed(1)}%`
+                ).join('\n');
                 
-                // Color based on probability
+                alert(`Token: "${tokenData.token}"\nProbability: ${(tokenData.probability * 100).toFixed(1)}%\nEntropy: ${tokenData.entropy.toFixed(2)}\n\nAlternatives:\n${details}`);
+            }
+
+            visualizeToken(tokenInfo) {
+                // Create a sphere for the token
+                const sphere = BABYLON.MeshBuilder.CreateSphere("token", {diameter: 0.3}, this.scene);
+                
+                // Position based on token properties
+                sphere.position.x = (Math.random() - 0.5) * 6;
+                sphere.position.y = (tokenInfo.probability - 0.5) * 4;
+                sphere.position.z = (Math.random() - 0.5) * 6;
+                
+                // Color based on uncertainty
                 const material = new BABYLON.StandardMaterial("tokenMat", this.scene);
                 material.emissiveColor = new BABYLON.Color3(
-                    tokenInfo.probability,
-                    1 - tokenInfo.probability,
-                    0.5
+                    tokenInfo.uncertainty === 'High' ? 1.0 : 0.3,
+                    tokenInfo.uncertainty === 'Low' ? 1.0 : 0.5,
+                    0.7
                 );
                 sphere.material = material;
                 
                 // Animate appearance
                 sphere.scaling = BABYLON.Vector3.Zero();
-                BABYLON.Animation.CreateAndStartAnimation("tokenAppear", sphere, "scaling", 30, 10,
-                    BABYLON.Vector3.Zero(), BABYLON.Vector3.One(), 0);
+                BABYLON.Animation.CreateAndStartAnimation("appear", sphere, "scaling", 
+                    30, 15, BABYLON.Vector3.Zero(), BABYLON.Vector3.One(), 0);
+                
+                // Remove after 5 seconds
+                setTimeout(() => {
+                    sphere.dispose();
+                }, 5000);
             }
 
-            updateVisualization() {
-                // Update 3D visualization based on current view mode
-                switch (this.currentView) {
-                    case 'embedding':
-                        this.showEmbeddingSpace();
-                        break;
-                    case 'probability':
-                        this.showProbabilitySpace();
-                        break;
-                    case 'uncertainty':
-                        this.showUncertaintyMap();
-                        break;
-                    case 'attention':
-                        this.showAttentionFlow();
-                        break;
+            switchTab(tabName) {
+                this.currentTab = tabName;
+                
+                // Update tab buttons
+                document.querySelectorAll('.tab').forEach(tab => {
+                    tab.classList.toggle('active', tab.dataset.tab === tabName);
+                });
+                
+                // Update tab content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.toggle('active', content.id === `${tabName}-content`);
+                });
+            }
+
+            updateGenerationUI(isGenerating) {
+                document.getElementById('generateBtn').disabled = isGenerating;
+                document.getElementById('generateBtn').innerHTML = isGenerating ? 
+                    '<span>⏹️</span> Stop' : '<span>✨</span> Generate';
+                
+                if (isGenerating) {
+                    document.getElementById('generateBtn').onclick = () => {
+                        this.isGenerating = false;
+                    };
+                } else {
+                    document.getElementById('generateBtn').onclick = () => {
+                        this.generateText();
+                    };
                 }
-            }
-
-            showEmbeddingSpace() {
-                // Visualize token embeddings in 3D space
-                console.log("Showing embedding space");
-            }
-
-            showProbabilitySpace() {
-                // Visualize probability distributions
-                console.log("Showing probability space");
-            }
-
-            showUncertaintyMap() {
-                // Visualize model uncertainty
-                console.log("Showing uncertainty map");
-            }
-
-            showAttentionFlow() {
-                // Visualize attention patterns
-                console.log("Showing attention flow");
-            }
-
-            displayTokenAnalysis(tokenInfo) {
-                const tokenList = document.getElementById('tokenList');
-                tokenList.innerHTML = '';
-                
-                // Show current token details
-                const tokenItem = document.createElement('div');
-                tokenItem.className = 'token-item';
-                tokenItem.innerHTML = `
-                    <span class="token-text">${tokenInfo.token}</span>
-                    <span class="token-prob">${(tokenInfo.probability * 100).toFixed(1)}%</span>
-                `;
-                tokenList.appendChild(tokenItem);
-                
-                // Show alternative tokens
-                if (tokenInfo.topTokens) {
-                    tokenInfo.topTokens.slice(1, 6).forEach(alt => {
-                        const altItem = document.createElement('div');
-                        altItem.className = 'token-item';
-                        altItem.style.opacity = '0.6';
-                        altItem.innerHTML = `
-                            <span class="token-text">${alt.token}</span>
-                            <span class="token-prob">${(Math.exp(alt.logprob) * 100).toFixed(1)}%</span>
-                        `;
-                        tokenList.appendChild(altItem);
-                    });
-                }
-            }
-
-            toggleComparisonMode() {
-                const comparisonMode = document.getElementById('comparisonMode');
-                comparisonMode.classList.toggle('open');
-            }
-
-            async runComparison() {
-                const promptA = document.getElementById('promptA').value.trim();
-                const promptB = document.getElementById('promptB').value.trim();
-                
-                if (!promptA || !promptB) return;
-                
-                console.log("Running comparison between:", promptA, "and", promptB);
-                // Implement comparison logic
             }
 
             exportData() {
                 const data = {
-                    tokenData: this.tokenData,
-                    probabilityHistory: this.probabilityHistory,
+                    tokens: this.tokenData,
                     model: this.currentModel,
-                    timestamp: new Date().toISOString()
+                    prompt: document.getElementById('promptInput').value,
+                    settings: {
+                        temperature: parseFloat(document.getElementById('tempSlider').value),
+                        maxTokens: parseInt(document.getElementById('maxTokens').value),
+                        layer: parseInt(document.getElementById('layerValue').textContent)
+                    },
+                    timestamp: new Date().toISOString(),
+                    summary: {
+                        totalTokens: this.tokenData.length,
+                        avgEntropy: this.tokenData.reduce((sum, t) => sum + t.entropy, 0) / this.tokenData.length || 0,
+                        avgConfidence: this.tokenData.reduce((sum, t) => sum + t.probability, 0) / this.tokenData.length || 0
+                    }
                 };
                 
                 const blob = new Blob([JSON.stringify(data, null, 2)], 
@@ -1072,34 +1217,23 @@
                 
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `llm-introspection-${Date.now()}.json`;
+                a.download = `llm-research-${Date.now()}.json`;
                 a.click();
                 
                 URL.revokeObjectURL(url);
             }
 
-            switchTab(tabName) {
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            updateModelStatus(status, name, details) {
+                const statusDot = document.getElementById('statusDot');
+                statusDot.className = `status-dot ${status}`;
                 
-                document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-                document.getElementById(`${tabName}-tab`).classList.add('active');
+                document.getElementById('modelName').textContent = name;
+                document.getElementById('modelDetails').textContent = details;
             }
 
-            showGestureHints() {
-                const hints = document.getElementById('gestureHints');
-                hints.classList.add('show');
-                setTimeout(() => {
-                    hints.classList.remove('show');
-                }, 3000);
-            }
-
-            updateLoadingText(text) {
+            updateLoadingText(text, details = '') {
                 document.getElementById('loadingText').textContent = text;
-            }
-
-            updateModelStatus(status) {
-                document.getElementById('modelStatus').textContent = status;
+                document.getElementById('loadingDetails').textContent = details;
             }
 
             showLoadingScreen() {
@@ -1113,7 +1247,7 @@
 
         // Initialize when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
-            new ResearchLLMIntrospector();
+            new LLMResearchExplorer();
         });
     </script>
 </body>
