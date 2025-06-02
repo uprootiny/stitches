@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Latent Space Explorer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: radial-gradient(ellipse at center, #0a0a1a 0%, #000006 50%, #000000 100%);
+            overflow: hidden;
+            height: 100vh;
+            touch-action: none;
+            cursor: none;
+            font-family: 'Monaco', 'Menlo', monospace;
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .latent-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 11px;
+            line-height: 1.4;
+            pointer-events: none;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid rgba(100, 200, 255, 0.2);
+            backdrop-filter: blur(10px);
+            max-width: 300px;
+        }
+
+        .semantic-anchor {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(100, 200, 255, 0.3) 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            animation: pulse 2s infinite ease-in-out;
+            z-index: 50;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
+        }
+
+        .gradient-flow {
+            position: absolute;
+            width: 2px;
+            height: 20px;
+            background: linear-gradient(0deg, transparent, rgba(255, 100, 100, 0.8), transparent);
+            pointer-events: none;
+            animation: flow 1.5s infinite ease-in-out;
+            z-index: 40;
+        }
+
+        @keyframes flow {
+            0% { opacity: 0; transform: translateY(20px); }
+            50% { opacity: 1; transform: translateY(0px); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+
+        .attention-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 30;
+            background: radial-gradient(circle at var(--x, 50%) var(--y, 50%), 
+                rgba(255, 200, 100, 0.1) 0%, 
+                rgba(100, 200, 255, 0.05) 30%, 
+                transparent 60%);
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div class="latent-info" id="latentInfo">
+            <div>Latent Coordinates: <span id="coords">[0.00, 0.00, 0.00]</span></div>
+            <div>Semantic Cluster: <span id="cluster">Abstract Concepts</span></div>
+            <div>Attention Focus: <span id="attention">Distributed</span></div>
+            <div>Layer Depth: <span id="layer">Embedding</span></div>
+            <div>Gradient Magnitude: <span id="gradient">0.42</span></div>
+            <div>Token Similarity: <span id="similarity">0.76</span></div>
+        </div>
+        <div class="attention-overlay" id="attentionOverlay"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        class LatentSpaceExplorer {
+            constructor() {
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.manifold = null;
+                this.material = null;
+                this.time = 0;
+                
+                // Latent space state
+                this.currentLatent = { x: 0, y: 0, z: 0 };
+                this.semanticClusters = this.generateSemanticClusters();
+                this.attentionHeads = 8;
+                this.layerDepth = 0;
+                this.gradientFlows = [];
+                this.semanticAnchors = [];
+                
+                // Interaction state
+                this.pointer = { x: 0, y: 0 };
+                this.isExploring = false;
+                this.explorationPath = [];
+                this.maxPathLength = 50;
+                
+                this.init();
+                this.createLatentManifold();
+                this.createSemanticAnchors();
+                this.setupEventListeners();
+                this.animate();
+            }
+
+            init() {
+                this.scene = new THREE.Scene();
+                
+                const aspect = window.innerWidth / window.innerHeight;
+                this.camera = new THREE.PerspectiveCamera(70, aspect, 0.1, 1000);
+                this.camera.position.z = 5;
+                
+                this.renderer = new THREE.WebGLRenderer({ 
+                    antialias: window.devicePixelRatio < 2,
+                    alpha: true,
+                    powerPreference: "high-performance"
+                });
+                
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.setClearColor(0x000000, 0);
+                
+                document.getElementById('container').appendChild(this.renderer.domElement);
+            }
+
+            generateSemanticClusters() {
+                return [
+                    { name: "Abstract Concepts", center: [0, 0, 0], radius: 0.8, color: [0.2, 0.4, 1.0] },
+                    { name: "Mathematical Ideas", center: [0.7, -0.3, 0.2], radius: 0.6, color: [0.8, 0.2, 0.9] },
+                    { name: "Natural Language", center: [-0.5, 0.6, -0.1], radius: 0.7, color: [0.1, 0.9, 0.5] },
+                    { name: "Emotional Concepts", center: [0.2, -0.8, 0.5], radius: 0.5, color: [1.0, 0.4, 0.2] },
+                    { name: "Technical Knowledge", center: [-0.8, -0.2, -0.4], radius: 0.6, color: [0.5, 0.8, 1.0] },
+                    { name: "Creative Expressions", center: [0.4, 0.5, -0.7], radius: 0.4, color: [0.9, 0.7, 0.3] },
+                    { name: "Logical Reasoning", center: [-0.3, 0.1, 0.8], radius: 0.5, color: [0.6, 0.3, 0.8] },
+                    { name: "Memory Patterns", center: [0.1, 0.3, -0.2], radius: 0.3, color: [0.8, 0.8, 0.4] }
+                ];
+            }
+
+            createLatentManifold() {
+                // High-resolution manifold for detailed exploration
+                const segments = 80;
+                const rings = 40;
+                const geometry = new THREE.ParametricGeometry(this.latentManifoldParametric.bind(this), segments, rings);
+                
+                this.material = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        explorationPath: { value: new Array(this.maxPathLength * 3).fill(0) },
+                        pathLength: { value: 0 },
+                        currentLatent: { value: new THREE.Vector3() },
+                        semanticClusters: { value: this.flattenClusters() },
+                        attentionWeights: { value: new Array(this.attentionHeads).fill(0) },
+                        layerDepth: { value: 0 },
+                        gradientMagnitude: { value: 0 },
+                        isExploring: { value: 0 }
+                    },
+                    vertexShader: `
+                        uniform float time;
+                        uniform float explorationPath[150]; // 50 * 3 coordinates
+                        uniform int pathLength;
+                        uniform vec3 currentLatent;
+                        uniform float semanticClusters[64]; // 8 clusters * 8 properties each
+                        uniform float attentionWeights[8];
+                        uniform float layerDepth;
+                        uniform float gradientMagnitude;
+                        uniform float isExploring;
+                        
+                        varying vec3 vPosition;
+                        varying vec3 vNormal;
+                        varying vec3 vLatentCoord;
+                        varying float vSemanticDistance;
+                        varying float vAttentionWeight;
+                        varying float vGradientStrength;
+                        
+                        // Advanced noise for latent space structure
+                        float hash(vec3 p) {
+                            p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+                            p += dot(p, p.yzx + 33.33);
+                            return fract((p.x + p.y) * p.z);
+                        }
+                        
+                        float noise(vec3 x) {
+                            vec3 i = floor(x);
+                            vec3 f = fract(x);
+                            f = f * f * (3.0 - 2.0 * f);
+                            
+                            return mix(
+                                mix(mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
+                                    mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+                                mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+                                    mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+                        }
+                        
+                        float fbm(vec3 p) {
+                            float value = 0.0;
+                            float amplitude = 0.5;
+                            for(int i = 0; i < 6; i++) {
+                                value += amplitude * noise(p);
+                                p *= 2.0;
+                                amplitude *= 0.5;
+                            }
+                            return value;
+                        }
+                        
+                        // Calculate semantic distance to nearest cluster
+                        float getSemanticDistance(vec3 pos) {
+                            float minDist = 10.0;
+                            for(int i = 0; i < 8; i++) {
+                                int baseIdx = i * 8;
+                                vec3 clusterCenter = vec3(
+                                    semanticClusters[baseIdx],
+                                    semanticClusters[baseIdx + 1],
+                                    semanticClusters[baseIdx + 2]
+                                );
+                                float clusterRadius = semanticClusters[baseIdx + 3];
+                                float dist = distance(pos, clusterCenter) / clusterRadius;
+                                minDist = min(minDist, dist);
+                            }
+                            return minDist;
+                        }
+                        
+                        // Calculate exploration path influence
+                        float getPathInfluence(vec3 pos) {
+                            float influence = 0.0;
+                            for(int i = 0; i < 50; i++) {
+                                if(i >= pathLength) break;
+                                
+                                vec3 pathPoint = vec3(
+                                    explorationPath[i * 3],
+                                    explorationPath[i * 3 + 1],
+                                    explorationPath[i * 3 + 2]
+                                );
+                                
+                                float dist = distance(pos, pathPoint);
+                                float weight = 1.0 - float(i) / float(pathLength);
+                                influence += exp(-dist * 5.0) * weight * 0.1;
+                            }
+                            return influence;
+                        }
+                        
+                        void main() {
+                            vPosition = position;
+                            vNormal = normal;
+                            
+                            // Map position to latent coordinates
+                            vec3 latentPos = position * 2.0;
+                            vLatentCoord = latentPos;
+                            
+                            // Calculate semantic clustering influence
+                            vSemanticDistance = getSemanticDistance(latentPos);
+                            
+                            // Multi-scale latent space deformation
+                            float manifoldNoise = fbm(latentPos * 1.5 + time * 0.1) * 0.3;
+                            float detailNoise = fbm(latentPos * 4.0 + time * 0.05) * 0.15;
+                            float microNoise = fbm(latentPos * 8.0 + time * 0.02) * 0.08;
+                            
+                            // Semantic cluster influence on geometry
+                            float clusterInfluence = 0.0;
+                            for(int i = 0; i < 8; i++) {
+                                int baseIdx = i * 8;
+                                vec3 clusterCenter = vec3(
+                                    semanticClusters[baseIdx],
+                                    semanticClusters[baseIdx + 1],
+                                    semanticClusters[baseIdx + 2]
+                                );
+                                float clusterRadius = semanticClusters[baseIdx + 3];
+                                float dist = distance(latentPos, clusterCenter);
+                                float strength = semanticClusters[baseIdx + 4];
+                                
+                                if(dist < clusterRadius) {
+                                    float localInfluence = (1.0 - dist / clusterRadius) * strength;
+                                    clusterInfluence += localInfluence * 0.2;
+                                }
+                            }
+                            
+                            // Exploration path creates temporal deformation
+                            float pathInfluence = getPathInfluence(latentPos);
+                            
+                            // Current exploration point creates strong local deformation
+                            float currentInfluence = 0.0;
+                            if(isExploring > 0.5) {
+                                float distToCurrent = distance(latentPos, currentLatent);
+                                currentInfluence = exp(-distToCurrent * 3.0) * 0.4;
+                            }
+                            
+                            // Attention mechanism influence
+                            float attentionInfluence = 0.0;
+                            for(int i = 0; i < 8; i++) {
+                                float headWeight = attentionWeights[i];
+                                float headPhase = time + float(i) * 0.8;
+                                attentionInfluence += sin(latentPos.x * 3.0 + headPhase) * 
+                                                   cos(latentPos.y * 2.5 + headPhase) * 
+                                                   headWeight * 0.05;
+                            }
+                            vAttentionWeight = attentionInfluence;
+                            
+                            // Gradient flow visualization
+                            float gradientFlow = sin(latentPos.x * 4.0 + time * 2.0) * 
+                                               cos(latentPos.y * 3.0 + time * 1.5) * 
+                                               gradientMagnitude * 0.1;
+                            vGradientStrength = gradientFlow;
+                            
+                            // Layer depth influence (higher layers = more abstract = smoother)
+                            float layerSmoothing = layerDepth * 0.3;
+                            float totalNoise = (manifoldNoise + detailNoise + microNoise) * (1.0 - layerSmoothing);
+                            
+                            // Combine all influences
+                            float totalDisplacement = totalNoise + clusterInfluence + 
+                                                    pathInfluence + currentInfluence + 
+                                                    attentionInfluence + gradientFlow;
+                            
+                            vec3 finalPosition = position + normal * totalDisplacement;
+                            
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(finalPosition, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform float time;
+                        uniform vec3 currentLatent;
+                        uniform float semanticClusters[64];
+                        uniform float attentionWeights[8];
+                        uniform float layerDepth;
+                        uniform float isExploring;
+                        
+                        varying vec3 vPosition;
+                        varying vec3 vNormal;
+                        varying vec3 vLatentCoord;
+                        varying float vSemanticDistance;
+                        varying float vAttentionWeight;
+                        varying float vGradientStrength;
+                        
+                        // Color palette for different semantic clusters
+                        vec3 getClusterColor(vec3 pos) {
+                            vec3 finalColor = vec3(0.1, 0.1, 0.2);
+                            float totalWeight = 0.0;
+                            
+                            for(int i = 0; i < 8; i++) {
+                                int baseIdx = i * 8;
+                                vec3 clusterCenter = vec3(
+                                    semanticClusters[baseIdx],
+                                    semanticClusters[baseIdx + 1],
+                                    semanticClusters[baseIdx + 2]
+                                );
+                                float clusterRadius = semanticClusters[baseIdx + 3];
+                                vec3 clusterColor = vec3(
+                                    semanticClusters[baseIdx + 5],
+                                    semanticClusters[baseIdx + 6],
+                                    semanticClusters[baseIdx + 7]
+                                );
+                                
+                                float dist = distance(pos, clusterCenter);
+                                if(dist < clusterRadius * 1.5) {
+                                    float weight = exp(-dist * 2.0);
+                                    finalColor += clusterColor * weight;
+                                    totalWeight += weight;
+                                }
+                            }
+                            
+                            if(totalWeight > 0.0) {
+                                finalColor /= totalWeight;
+                            }
+                            return finalColor;
+                        }
+                        
+                        // Attention visualization
+                        vec3 getAttentionColor() {
+                            vec3 attentionColor = vec3(0.0);
+                            for(int i = 0; i < 8; i++) {
+                                float weight = attentionWeights[i];
+                                float hue = float(i) / 8.0 * 6.28318;
+                                vec3 headColor = vec3(
+                                    sin(hue) * 0.5 + 0.5,
+                                    sin(hue + 2.094) * 0.5 + 0.5,
+                                    sin(hue + 4.188) * 0.5 + 0.5
+                                );
+                                attentionColor += headColor * weight;
+                            }
+                            return attentionColor * 0.3;
+                        }
+                        
+                        void main() {
+                            // Base semantic cluster color
+                            vec3 clusterColor = getClusterColor(vLatentCoord);
+                            
+                            // Attention head overlay
+                            vec3 attentionColor = getAttentionColor();
+                            
+                            // Gradient flow visualization
+                            vec3 gradientColor = vec3(1.0, 0.3, 0.1) * abs(vGradientStrength) * 2.0;
+                            
+                            // Current exploration highlight
+                            float distToCurrent = distance(vLatentCoord, currentLatent);
+                            float currentGlow = exp(-distToCurrent * 4.0) * isExploring * 0.8;
+                            vec3 explorationColor = vec3(1.0, 1.0, 0.8) * currentGlow;
+                            
+                            // Semantic distance affects brightness
+                            float semanticBrightness = 1.0 - smoothstep(0.5, 2.0, vSemanticDistance);
+                            
+                            // Layer depth affects saturation (deeper = more saturated)
+                            float saturation = 0.7 + layerDepth * 0.3;
+                            
+                            // Combine all color components
+                            vec3 finalColor = clusterColor * semanticBrightness * saturation +
+                                            attentionColor +
+                                            gradientColor +
+                                            explorationColor;
+                            
+                            // Fresnel rim lighting
+                            vec3 viewDir = normalize(-vPosition);
+                            float fresnel = pow(1.0 - abs(dot(normalize(vNormal), viewDir)), 2.0);
+                            finalColor += fresnel * vec3(0.2, 0.4, 0.8) * 0.5;
+                            
+                            // Latent space "energy" visualization
+                            float energy = length(vLatentCoord) * 0.1 + sin(time + vLatentCoord.x * 2.0) * 0.05;
+                            finalColor *= (1.0 + energy);
+                            
+                            // Attention weight influence on alpha
+                            float alpha = 0.8 + abs(vAttentionWeight) * 0.2;
+                            
+                            gl_FragColor = vec4(finalColor, alpha);
+                        }
+                    `,
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                this.manifold = new THREE.Mesh(geometry, this.material);
+                this.scene.add(this.manifold);
+            }
+
+            latentManifoldParametric(u, v, target) {
+                // Create a more complex manifold representing latent space topology
+                const phi = u * Math.PI * 2;
+                const theta = v * Math.PI;
+                
+                // Base hypersphere with semantic deformations
+                const x = Math.sin(theta) * Math.cos(phi);
+                const y = Math.sin(theta) * Math.sin(phi);
+                const z = Math.cos(theta);
+                
+                target.set(x, y, z);
+            }
+
+            flattenClusters() {
+                const flattened = [];
+                this.semanticClusters.forEach(cluster => {
+                    flattened.push(...cluster.center, cluster.radius, 1.0, ...cluster.color);
+                });
+                return flattened;
+            }
+
+            createSemanticAnchors() {
+                const container = document.getElementById('container');
+                
+                this.semanticClusters.forEach((cluster, index) => {
+                    const anchor = document.createElement('div');
+                    anchor.className = 'semantic-anchor';
+                    anchor.style.animationDelay = (index * 0.3) + 's';
+                    container.appendChild(anchor);
+                    this.semanticAnchors.push(anchor);
+                });
+            }
+
+            updateSemanticAnchors() {
+                this.semanticClusters.forEach((cluster, index) => {
+                    if (this.semanticAnchors[index]) {
+                        // Project 3D cluster center to screen coordinates
+                        const vector = new THREE.Vector3(...cluster.center);
+                        vector.project(this.camera);
+                        
+                        const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
+                        const y = (vector.y * -0.5 + 0.5) * window.innerHeight;
+                        
+                        this.semanticAnchors[index].style.left = x + 'px';
+                        this.semanticAnchors[index].style.top = y + 'px';
+                    }
+                });
+            }
+
+            setupEventListeners() {
+                const canvas = this.renderer.domElement;
+                const overlay = document.getElementById('attentionOverlay');
+                
+                const updatePointer = (clientX, clientY) => {
+                    this.pointer.x = (clientX / window.innerWidth) * 2 - 1;
+                    this.pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+                    
+                    // Update attention overlay
+                    overlay.style.setProperty('--x', (clientX / window.innerWidth * 100) + '%');
+                    overlay.style.setProperty('--y', (clientY / window.innerHeight * 100) + '%');
+                    
+                    // Convert to latent coordinates
+                    this.currentLatent.x = this.pointer.x * 2;
+                    this.currentLatent.y = this.pointer.y * 2;
+                    this.currentLatent.z = Math.sin(this.time + this.pointer.x) * 0.5;
+                    
+                    this.updateLatentInfo();
+                };
+                
+                const startExploration = (clientX, clientY) => {
+                    this.isExploring = true;
+                    updatePointer(clientX, clientY);
+                    this.addToExplorationPath();
+                    this.simulateAttentionUpdate();
+                };
+                
+                const endExploration = () => {
+                    this.isExploring = false;
+                };
+                
+                canvas.addEventListener('mousedown', (e) => {
+                    startExploration(e.clientX, e.clientY);
+                });
+                
+                canvas.addEventListener('mousemove', (e) => {
+                    updatePointer(e.clientX, e.clientY);
+                    if (this.isExploring) {
+                        this.addToExplorationPath();
+                    }
+                });
+                
+                canvas.addEventListener('mouseup', endExploration);
+                
+                canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    startExploration(touch.clientX, touch.clientY);
+                }, { passive: false });
+                
+                canvas.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    updatePointer(touch.clientX, touch.clientY);
+                    if (this.isExploring) {
+                        this.addToExplorationPath();
+                    }
+                }, { passive: false });
+                
+                canvas.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    endExploration();
+                }, { passive: false });
+                
+                window.addEventListener('resize', () => this.onWindowResize());
+            }
+
+            addToExplorationPath() {
+                this.explorationPath.push({
+                    x: this.currentLatent.x,
+                    y: this.currentLatent.y,
+                    z: this.currentLatent.z,
+                    time: this.time
+                });
+                
+                if (this.explorationPath.length > this.maxPathLength) {
+                    this.explorationPath.shift();
+                }
+                
+                // Update shader uniforms
+                const pathArray = new Array(this.maxPathLength * 3).fill(0);
+                for (let i = 0; i < Math.min(this.explorationPath.length, this.maxPathLength); i++) {
+                    const point = this.explorationPath[i];
+                    pathArray[i * 3] = point.x;
+                    pathArray[i * 3 + 1] = point.y;
+                    pathArray[i * 3 + 2] = point.z;
+                }
+                
+                this.material.uniforms.explorationPath.value = pathArray;
+                this.material.uniforms.pathLength.value = Math.min(this.explorationPath.length, this.maxPathLength);
+            }
+
+            simulateAttentionUpdate() {
+                // Simulate attention head activation based on current latent position
+                for (let i = 0; i < this.attentionHeads; i++) {
+                    const headPhase = this.time + i * 0.5;
+                    const activation = Math.abs(Math.sin(
+                        this.currentLatent.x * 2 + headPhase
+                    ) * Math.cos(
+                        this.currentLatent.y * 1.5 + headPhase
+                    ));
+                    this.material.uniforms.attentionWeights.value[i] = activation;
+                }
+            }
+
+            updateLatentInfo() {
+                // Find nearest semantic cluster
+                let nearestCluster = this.semanticClusters[0];
+                let minDistance = Infinity;
+                
+                this.semanticClusters.forEach(cluster => {
+                    const dist = Math.sqrt(
+                        Math.pow(this.currentLatent.x - cluster.center[0], 2) +
+                        Math.pow(this.currentLatent.y - cluster.center[1], 2) +
+                        Math.pow(this.currentLatent.z - cluster.center[2], 2)
+                    );
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        nearestCluster = cluster;
+                    }
+                });
+                
+                // Calculate derived metrics
+                const gradientMag = Math.abs(Math.sin(this.time + this.currentLatent.x)) * 0.8 + 0.2;
+                const similarity = Math.exp(-minDistance) * 0.9 + 0.1;
+                this.layerDepth = (Math.sin(this.time * 0.1) + 1) * 0.5;
+                
+                // Update UI
+                document.getElementById('coords').textContent = 
+                    `[${this.currentLatent.x.toFixed(2)}, ${this.currentLatent.y.toFixed(2)}, ${this.currentLatent.z.toFixed(2)}]`;
+                document.getElementById('cluster').textContent = nearestCluster.name;
+                document.getElementById('attention').textContent = this.isExploring ? 'Focused' : 'Distributed';
+                document.getElementById('layer').textContent = 
+                    ['Embedding', 'Low-Level', 'Mid-Level', 'High-Level', 'Output'][Math.floor(this.layerDepth * 5)];
+                document.getElementById('gradient').textContent = gradientMag.toFixed(2);
+                document.getElementById('similarity').textContent = similarity.toFixed(2);
+                
+                // Update shader uniforms
+                this.material.uniforms.gradientMagnitude.value = gradientMag;
+                this.material.uniforms.layerDepth.value = this.layerDepth;
+            }
+
+            onWindowResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                this.time += 0.016;
+                
+                // Update shader uniforms
+                this.material.uniforms.time.value = this.time;
+                this.material.uniforms.currentLatent.value.set(
+                    this.currentLatent.x,
+                    this.currentLatent.y,
+                    this.currentLatent.z
+                );
+                this.material.uniforms.isExploring.value = this.isExploring ? 1.0 : 0.0;
+                
+                // Slow manifold rotation to show different aspects
+                if (this.manifold) {
+                    this.manifold.rotation.x += 0.002;
+                    this.manifold.rotation.y += 0.003;
+                    this.manifold.rotation.z += 0.001;
+                }
+                
+                // Update semantic anchor positions
+                this.updateSemanticAnchors();
+                
+                // Periodic attention updates when not exploring
+                if (!this.isExploring && Math.random() > 0.98) {
+                    this.simulateAttentionUpdate();
+                }
+                
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new LatentSpaceExplorer();
+        });
+        
+        document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+        document.addEventListener('gesturestart', (e) => e.preventDefault());
+    </script>
+</body>
+</html>
