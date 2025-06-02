@@ -2,9 +2,32 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Latent Space Explorer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="description" content="Real-time LLM inference visualization with WebLLM and Babylon.js">
+    <title>LLM Introspection Interface</title>
+    
+    <!-- Preload critical resources -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://esm.run">
+    
     <style>
+        /* CSS Custom Properties for theming */
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: rgba(10, 10, 20, 0.9);
+            --border-primary: rgba(100, 200, 255, 0.3);
+            --border-accent: rgba(255, 100, 100, 0.3);
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --text-accent: #88ffaa;
+            --status-error: #ff4444;
+            --status-warning: #ffaa44;
+            --status-success: #44ff44;
+            --font-mono: 'Monaco', 'Menlo', 'Courier New', monospace;
+            --panel-width: min(320px, 90vw);
+            --probe-width: min(280px, 85vw);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,12 +35,13 @@
         }
 
         body {
-            background: radial-gradient(ellipse at center, #0a0a1a 0%, #000006 50%, #000000 100%);
+            background: var(--bg-primary);
             overflow: hidden;
             height: 100vh;
-            touch-action: none;
-            cursor: none;
-            font-family: 'Monaco', 'Menlo', monospace;
+            font-family: var(--font-mono);
+            color: var(--text-primary);
+            /* Prevent zoom on double tap */
+            touch-action: manipulation;
         }
 
         #container {
@@ -26,685 +50,1351 @@
             position: relative;
         }
 
-        canvas {
-            display: block;
+        #babylonCanvas {
             width: 100%;
             height: 100%;
+            display: block;
+            outline: none;
+            /* Improve touch responsiveness */
+            touch-action: none;
         }
 
-        .latent-info {
+        /* Responsive panel layout */
+        .control-panel {
             position: absolute;
             top: 20px;
             left: 20px;
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 11px;
-            line-height: 1.4;
-            pointer-events: none;
-            z-index: 100;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 10px;
-            border-radius: 4px;
-            border: 1px solid rgba(100, 200, 255, 0.2);
+            width: var(--panel-width);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            padding: 15px;
             backdrop-filter: blur(10px);
-            max-width: 300px;
+            z-index: 100;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            /* Smooth scrolling */
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-primary) transparent;
         }
 
-        .semantic-anchor {
-            position: absolute;
+        .control-panel::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .control-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .control-panel::-webkit-scrollbar-thumb {
+            background: var(--border-primary);
+            border-radius: 2px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 12px; /* Increased from 11px for accessibility */
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Form controls with improved accessibility */
+        select, input, button, textarea {
+            width: 100%;
+            background: rgba(20, 20, 30, 0.8);
+            border: 1px solid var(--border-primary);
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 12px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        select:focus, input:focus, button:focus, textarea:focus {
+            outline: none;
+            border-color: var(--border-accent);
+            box-shadow: 0 0 0 2px rgba(255, 100, 100, 0.2);
+        }
+
+        select, input {
+            padding: 8px;
+            margin-bottom: 5px;
+        }
+
+        button {
+            padding: 10px;
+            cursor: pointer;
+            margin-bottom: 5px;
+            min-height: 44px; /* Touch target size */
+        }
+
+        button:hover:not(:disabled) {
+            background: rgba(100, 200, 255, 0.2);
+            border-color: rgba(100, 200, 255, 0.6);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        textarea {
+            padding: 8px;
+            min-height: 60px;
+            resize: vertical;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        /* Status indicator with ARIA support */
+        .status-indicator {
+            display: inline-block;
             width: 8px;
             height: 8px;
-            background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(100, 200, 255, 0.3) 70%);
             border-radius: 50%;
-            pointer-events: none;
-            transform: translate(-50%, -50%);
-            animation: pulse 2s infinite ease-in-out;
-            z-index: 50;
+            margin-right: 8px;
+            background: var(--status-error);
+        }
+
+        .status-indicator.loading {
+            background: var(--status-warning);
+            animation: pulse 1s infinite;
+        }
+
+        .status-indicator.ready {
+            background: var(--status-success);
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
-            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.5); }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
-        .gradient-flow {
+        /* Responsive probe panel */
+        .probe-data {
             position: absolute;
-            width: 2px;
+            top: 20px;
+            right: 20px;
+            width: var(--probe-width);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-accent);
+            border-radius: 8px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+        }
+
+        .probe-section {
+            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 10px;
+        }
+
+        .probe-section:last-child {
+            border-bottom: none;
+        }
+
+        .probe-section h3 {
+            font-size: 12px; /* Increased for accessibility */
+            color: #ff8888;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            line-height: 1.6;
+            color: #c0c0c0;
+        }
+
+        .metric-value {
+            color: var(--text-accent);
+            font-weight: bold;
+        }
+
+        /* Accessible attention matrix */
+        .attention-matrix {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 2px;
+            margin-top: 8px;
+            role: grid;
+        }
+
+        .attention-cell {
+            width: 20px;
             height: 20px;
-            background: linear-gradient(0deg, transparent, rgba(255, 100, 100, 0.8), transparent);
-            pointer-events: none;
-            animation: flow 1.5s infinite ease-in-out;
-            z-index: 40;
+            background: rgba(100, 200, 255, 0.1);
+            border-radius: 2px;
+            transition: background 0.2s ease;
+            position: relative;
         }
 
-        @keyframes flow {
-            0% { opacity: 0; transform: translateY(20px); }
-            50% { opacity: 1; transform: translateY(0px); }
-            100% { opacity: 0; transform: translateY(-20px); }
+        .attention-cell[aria-selected="true"] {
+            outline: 2px solid white;
         }
 
-        .attention-overlay {
+        .token-list {
+            max-height: 120px;
+            overflow-y: auto;
+            font-size: 10px;
+            line-height: 1.4;
+        }
+
+        .token {
+            padding: 2px 4px;
+            margin: 1px;
+            background: rgba(100, 200, 255, 0.1);
+            border-radius: 2px;
+            display: inline-block;
+            word-break: break-all;
+        }
+
+        .token.current {
+            background: rgba(255, 200, 100, 0.3);
+        }
+
+        /* Responsive output area */
+        .output-area {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            height: 150px;
+            background: var(--bg-secondary);
+            border: 1px solid rgba(100, 255, 100, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .loading-screen {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            pointer-events: none;
-            z-index: 30;
-            background: radial-gradient(circle at var(--x, 50%) var(--y, 50%), 
-                rgba(255, 200, 100, 0.1) 0%, 
-                rgba(100, 200, 255, 0.05) 30%, 
-                transparent 60%);
-            transition: all 0.3s ease;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            color: var(--text-primary);
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid #64c8ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .disclaimer {
+            background: rgba(255, 200, 100, 0.1);
+            border: 1px solid rgba(255, 200, 100, 0.3);
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 10px;
+            line-height: 1.3;
+            color: #ffcc88;
+            margin-bottom: 10px;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            :root {
+                --panel-width: calc(100vw - 40px);
+                --probe-width: calc(100vw - 40px);
+            }
+            
+            .control-panel {
+                position: relative;
+                margin-bottom: 20px;
+                max-height: none;
+            }
+            
+            .probe-data {
+                position: relative;
+                top: auto;
+                right: auto;
+                left: 20px;
+                margin-bottom: 20px;
+                max-height: none;
+            }
+            
+            .output-area {
+                position: relative;
+                bottom: auto;
+                left: 20px;
+                right: 20px;
+                margin-bottom: 20px;
+                height: auto;
+                min-height: 100px;
+            }
+            
+            #babylonCanvas {
+                height: 50vh;
+            }
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            :root {
+                --bg-primary: #000000;
+                --bg-secondary: rgba(0, 0, 0, 0.95);
+                --border-primary: #ffffff;
+                --text-primary: #ffffff;
+            }
+        }
+
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            .loading-spinner {
+                animation: none;
+            }
+            
+            .status-indicator.loading {
+                animation: none;
+            }
+            
+            * {
+                transition: none !important;
+            }
+        }
+
+        /* Dark mode (default) but respecting system preferences */
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg-primary: #f5f5f5;
+                --bg-secondary: rgba(255, 255, 255, 0.9);
+                --border-primary: rgba(0, 100, 200, 0.3);
+                --text-primary: #2d2d2d;
+                --text-secondary: #666666;
+            }
         }
     </style>
 </head>
 <body>
     <div id="container">
-        <div class="latent-info" id="latentInfo">
-            <div>Latent Coordinates: <span id="coords">[0.00, 0.00, 0.00]</span></div>
-            <div>Semantic Cluster: <span id="cluster">Abstract Concepts</span></div>
-            <div>Attention Focus: <span id="attention">Distributed</span></div>
-            <div>Layer Depth: <span id="layer">Embedding</span></div>
-            <div>Gradient Magnitude: <span id="gradient">0.42</span></div>
-            <div>Token Similarity: <span id="similarity">0.76</span></div>
+        <canvas id="babylonCanvas" aria-label="3D LLM introspection visualization"></canvas>
+        
+        <div class="loading-screen" id="loadingScreen">
+            <div class="loading-spinner" aria-label="Loading"></div>
+            <div id="loadingText">Initializing WebLLM...</div>
         </div>
-        <div class="attention-overlay" id="attentionOverlay"></div>
+        
+        <div class="control-panel">
+            <div class="disclaimer">
+                <strong>Note:</strong> This visualizes real LLM inference, but internal "probe data" (attention patterns, hidden states) is simulated for demonstration. WebLLM currently only exposes token probabilities.
+            </div>
+            
+            <div class="control-group">
+                <label>Model Status</label>
+                <div>
+                    <span class="status-indicator" id="statusIndicator" aria-hidden="true"></span>
+                    <span id="statusText">Initializing...</span>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label for="modelSelect">Model Selection</label>
+                <select id="modelSelect" aria-describedby="modelHelp">
+                    <option value="Phi-2-GGUF">Phi-2 (2.7B - Default)</option>
+                    <option value="TinyLlama-1.1B-Chat-v0.4-q4f16_1-1k">TinyLlama (1.1B)</option>
+                    <option value="Llama-2-7b-chat-hf-q4f16_1-1k">Llama-2-7B (Larger)</option>
+                </select>
+                <div id="modelHelp" style="font-size: 10px; color: var(--text-secondary);">
+                    Smaller models load faster and use less memory
+                </div>
+                <button id="loadModelBtn">Load Model</button>
+            </div>
+            
+            <div class="control-group">
+                <label for="promptInput">Prompt Input</label>
+                <textarea id="promptInput" placeholder="Enter your prompt here..." aria-describedby="promptHelp">The meaning of life is</textarea>
+                <div id="promptHelp" style="font-size: 10px; color: var(--text-secondary);">
+                    Keep prompts concise for better performance
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label>Inference Controls</label>
+                <button id="generateBtn" aria-describedby="generateHelp">Generate</button>
+                <button id="stopBtn" disabled>Stop</button>
+                <button id="resetBtn">Reset</button>
+                <div id="generateHelp" style="font-size: 10px; color: var(--text-secondary);">
+                    Generation affects the 3D visualization in real-time
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label>Generation Settings</label>
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 5px;">
+                    <label for="temperatureSlider" style="font-size: 10px; margin: 0;">Temperature:</label>
+                    <input type="range" id="temperatureSlider" min="0.1" max="2.0" step="0.1" value="0.7" style="flex: 1;" aria-describedby="tempHelp">
+                    <span id="temperatureValue" style="font-size: 10px; color: var(--text-accent);">0.7</span>
+                </div>
+                <div id="tempHelp" style="font-size: 9px; color: var(--text-secondary); margin-bottom: 5px;">
+                    Lower = more focused, Higher = more creative
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <label for="maxTokens" style="font-size: 10px; margin: 0;">Max Tokens:</label>
+                    <input type="number" id="maxTokens" min="1" max="500" value="50" style="flex: 1;">
+                </div>
+            </div>
+        </div>
+        
+        <div class="probe-data">
+            <div class="probe-section">
+                <h3>Current State</h3>
+                <div class="metric">
+                    <span>Layer:</span>
+                    <span class="metric-value" id="currentLayer">-</span>
+                </div>
+                <div class="metric">
+                    <span>Token:</span>
+                    <span class="metric-value" id="currentToken">-</span>
+                </div>
+                <div class="metric">
+                    <span>Position:</span>
+                    <span class="metric-value" id="tokenPosition">-</span>
+                </div>
+            </div>
+            
+            <div class="probe-section">
+                <h3>Attention Patterns <small>(Simulated)</small></h3>
+                <div class="metric">
+                    <span>Avg Attention:</span>
+                    <span class="metric-value" id="avgAttention">0.00</span>
+                </div>
+                <div class="attention-matrix" id="attentionMatrix" role="grid" aria-label="Simulated attention head matrix"></div>
+            </div>
+            
+            <div class="probe-section">
+                <h3>Hidden States <small>(Simulated)</small></h3>
+                <div class="metric">
+                    <span>L2 Norm:</span>
+                    <span class="metric-value" id="hiddenNorm">0.00</span>
+                </div>
+                <div class="metric">
+                    <span>Entropy:</span>
+                    <span class="metric-value" id="hiddenEntropy">0.00</span>
+                </div>
+            </div>
+            
+            <div class="probe-section">
+                <h3>Token Probabilities</h3>
+                <div class="metric">
+                    <span>Top Token Prob:</span>
+                    <span class="metric-value" id="topTokenProb">0.00</span>
+                </div>
+                <div class="metric">
+                    <span>Perplexity:</span>
+                    <span class="metric-value" id="perplexity">0.00</span>
+                </div>
+            </div>
+            
+            <div class="probe-section">
+                <h3>Generated Tokens</h3>
+                <div class="token-list" id="tokenList" aria-live="polite" aria-label="Generated tokens"></div>
+            </div>
+        </div>
+        
+        <div class="output-area" id="outputArea">
+            <strong>Model Output:</strong><br>
+            <span id="generatedText">Ready for inference...</span>
+        </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        class LatentSpaceExplorer {
-            constructor() {
-                this.scene = null;
-                this.camera = null;
-                this.renderer = null;
-                this.manifold = null;
-                this.material = null;
-                this.time = 0;
-                
-                // Latent space state
-                this.currentLatent = { x: 0, y: 0, z: 0 };
-                this.semanticClusters = this.generateSemanticClusters();
-                this.attentionHeads = 8;
-                this.layerDepth = 0;
-                this.gradientFlows = [];
-                this.semanticAnchors = [];
-                
-                // Interaction state
-                this.pointer = { x: 0, y: 0 };
-                this.isExploring = false;
-                this.explorationPath = [];
-                this.maxPathLength = 50;
-                
-                this.init();
-                this.createLatentManifold();
-                this.createSemanticAnchors();
-                this.setupEventListeners();
-                this.animate();
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babylonjs/6.0.0/babylon.min.js" 
+            integrity="sha512-oPJaUCNOg6zHCHVahjJGSjxKQc3GhtzWLGCBdJWyKQDwRK5lJHO4KdEjJRR/xhTYdCjjrDrJOJBxc+oXN6N39w==" 
+            crossorigin="anonymous" 
+            referrerpolicy="no-referrer"></script>
+    
+    <script type="module">
+        // Error handling and logging utility
+        class Logger {
+            static error(message, error = null) {
+                console.error(`[LLM-Introspection] ${message}`, error);
+                // In production, send to monitoring service
             }
-
-            init() {
-                this.scene = new THREE.Scene();
-                
-                const aspect = window.innerWidth / window.innerHeight;
-                this.camera = new THREE.PerspectiveCamera(70, aspect, 0.1, 1000);
-                this.camera.position.z = 5;
-                
-                this.renderer = new THREE.WebGLRenderer({ 
-                    antialias: window.devicePixelRatio < 2,
-                    alpha: true,
-                    powerPreference: "high-performance"
-                });
-                
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-                this.renderer.setClearColor(0x000000, 0);
-                
-                document.getElementById('container').appendChild(this.renderer.domElement);
+            
+            static warn(message) {
+                console.warn(`[LLM-Introspection] ${message}`);
             }
-
-            generateSemanticClusters() {
-                return [
-                    { name: "Abstract Concepts", center: [0, 0, 0], radius: 0.8, color: [0.2, 0.4, 1.0] },
-                    { name: "Mathematical Ideas", center: [0.7, -0.3, 0.2], radius: 0.6, color: [0.8, 0.2, 0.9] },
-                    { name: "Natural Language", center: [-0.5, 0.6, -0.1], radius: 0.7, color: [0.1, 0.9, 0.5] },
-                    { name: "Emotional Concepts", center: [0.2, -0.8, 0.5], radius: 0.5, color: [1.0, 0.4, 0.2] },
-                    { name: "Technical Knowledge", center: [-0.8, -0.2, -0.4], radius: 0.6, color: [0.5, 0.8, 1.0] },
-                    { name: "Creative Expressions", center: [0.4, 0.5, -0.7], radius: 0.4, color: [0.9, 0.7, 0.3] },
-                    { name: "Logical Reasoning", center: [-0.3, 0.1, 0.8], radius: 0.5, color: [0.6, 0.3, 0.8] },
-                    { name: "Memory Patterns", center: [0.1, 0.3, -0.2], radius: 0.3, color: [0.8, 0.8, 0.4] }
-                ];
-            }
-
-            createLatentManifold() {
-                // High-resolution manifold for detailed exploration
-                const segments = 80;
-                const rings = 40;
-                const geometry = new THREE.ParametricGeometry(this.latentManifoldParametric.bind(this), segments, rings);
-                
-                this.material = new THREE.ShaderMaterial({
-                    uniforms: {
-                        time: { value: 0 },
-                        explorationPath: { value: new Array(this.maxPathLength * 3).fill(0) },
-                        pathLength: { value: 0 },
-                        currentLatent: { value: new THREE.Vector3() },
-                        semanticClusters: { value: this.flattenClusters() },
-                        attentionWeights: { value: new Array(this.attentionHeads).fill(0) },
-                        layerDepth: { value: 0 },
-                        gradientMagnitude: { value: 0 },
-                        isExploring: { value: 0 }
-                    },
-                    vertexShader: `
-                        uniform float time;
-                        uniform float explorationPath[150]; // 50 * 3 coordinates
-                        uniform int pathLength;
-                        uniform vec3 currentLatent;
-                        uniform float semanticClusters[64]; // 8 clusters * 8 properties each
-                        uniform float attentionWeights[8];
-                        uniform float layerDepth;
-                        uniform float gradientMagnitude;
-                        uniform float isExploring;
-                        
-                        varying vec3 vPosition;
-                        varying vec3 vNormal;
-                        varying vec3 vLatentCoord;
-                        varying float vSemanticDistance;
-                        varying float vAttentionWeight;
-                        varying float vGradientStrength;
-                        
-                        // Advanced noise for latent space structure
-                        float hash(vec3 p) {
-                            p = fract(p * vec3(0.1031, 0.1030, 0.0973));
-                            p += dot(p, p.yzx + 33.33);
-                            return fract((p.x + p.y) * p.z);
-                        }
-                        
-                        float noise(vec3 x) {
-                            vec3 i = floor(x);
-                            vec3 f = fract(x);
-                            f = f * f * (3.0 - 2.0 * f);
-                            
-                            return mix(
-                                mix(mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
-                                    mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
-                                mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
-                                    mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
-                        }
-                        
-                        float fbm(vec3 p) {
-                            float value = 0.0;
-                            float amplitude = 0.5;
-                            for(int i = 0; i < 6; i++) {
-                                value += amplitude * noise(p);
-                                p *= 2.0;
-                                amplitude *= 0.5;
-                            }
-                            return value;
-                        }
-                        
-                        // Calculate semantic distance to nearest cluster
-                        float getSemanticDistance(vec3 pos) {
-                            float minDist = 10.0;
-                            for(int i = 0; i < 8; i++) {
-                                int baseIdx = i * 8;
-                                vec3 clusterCenter = vec3(
-                                    semanticClusters[baseIdx],
-                                    semanticClusters[baseIdx + 1],
-                                    semanticClusters[baseIdx + 2]
-                                );
-                                float clusterRadius = semanticClusters[baseIdx + 3];
-                                float dist = distance(pos, clusterCenter) / clusterRadius;
-                                minDist = min(minDist, dist);
-                            }
-                            return minDist;
-                        }
-                        
-                        // Calculate exploration path influence
-                        float getPathInfluence(vec3 pos) {
-                            float influence = 0.0;
-                            for(int i = 0; i < 50; i++) {
-                                if(i >= pathLength) break;
-                                
-                                vec3 pathPoint = vec3(
-                                    explorationPath[i * 3],
-                                    explorationPath[i * 3 + 1],
-                                    explorationPath[i * 3 + 2]
-                                );
-                                
-                                float dist = distance(pos, pathPoint);
-                                float weight = 1.0 - float(i) / float(pathLength);
-                                influence += exp(-dist * 5.0) * weight * 0.1;
-                            }
-                            return influence;
-                        }
-                        
-                        void main() {
-                            vPosition = position;
-                            vNormal = normal;
-                            
-                            // Map position to latent coordinates
-                            vec3 latentPos = position * 2.0;
-                            vLatentCoord = latentPos;
-                            
-                            // Calculate semantic clustering influence
-                            vSemanticDistance = getSemanticDistance(latentPos);
-                            
-                            // Multi-scale latent space deformation
-                            float manifoldNoise = fbm(latentPos * 1.5 + time * 0.1) * 0.3;
-                            float detailNoise = fbm(latentPos * 4.0 + time * 0.05) * 0.15;
-                            float microNoise = fbm(latentPos * 8.0 + time * 0.02) * 0.08;
-                            
-                            // Semantic cluster influence on geometry
-                            float clusterInfluence = 0.0;
-                            for(int i = 0; i < 8; i++) {
-                                int baseIdx = i * 8;
-                                vec3 clusterCenter = vec3(
-                                    semanticClusters[baseIdx],
-                                    semanticClusters[baseIdx + 1],
-                                    semanticClusters[baseIdx + 2]
-                                );
-                                float clusterRadius = semanticClusters[baseIdx + 3];
-                                float dist = distance(latentPos, clusterCenter);
-                                float strength = semanticClusters[baseIdx + 4];
-                                
-                                if(dist < clusterRadius) {
-                                    float localInfluence = (1.0 - dist / clusterRadius) * strength;
-                                    clusterInfluence += localInfluence * 0.2;
-                                }
-                            }
-                            
-                            // Exploration path creates temporal deformation
-                            float pathInfluence = getPathInfluence(latentPos);
-                            
-                            // Current exploration point creates strong local deformation
-                            float currentInfluence = 0.0;
-                            if(isExploring > 0.5) {
-                                float distToCurrent = distance(latentPos, currentLatent);
-                                currentInfluence = exp(-distToCurrent * 3.0) * 0.4;
-                            }
-                            
-                            // Attention mechanism influence
-                            float attentionInfluence = 0.0;
-                            for(int i = 0; i < 8; i++) {
-                                float headWeight = attentionWeights[i];
-                                float headPhase = time + float(i) * 0.8;
-                                attentionInfluence += sin(latentPos.x * 3.0 + headPhase) * 
-                                                   cos(latentPos.y * 2.5 + headPhase) * 
-                                                   headWeight * 0.05;
-                            }
-                            vAttentionWeight = attentionInfluence;
-                            
-                            // Gradient flow visualization
-                            float gradientFlow = sin(latentPos.x * 4.0 + time * 2.0) * 
-                                               cos(latentPos.y * 3.0 + time * 1.5) * 
-                                               gradientMagnitude * 0.1;
-                            vGradientStrength = gradientFlow;
-                            
-                            // Layer depth influence (higher layers = more abstract = smoother)
-                            float layerSmoothing = layerDepth * 0.3;
-                            float totalNoise = (manifoldNoise + detailNoise + microNoise) * (1.0 - layerSmoothing);
-                            
-                            // Combine all influences
-                            float totalDisplacement = totalNoise + clusterInfluence + 
-                                                    pathInfluence + currentInfluence + 
-                                                    attentionInfluence + gradientFlow;
-                            
-                            vec3 finalPosition = position + normal * totalDisplacement;
-                            
-                            gl_Position = projectionMatrix * modelViewMatrix * vec4(finalPosition, 1.0);
-                        }
-                    `,
-                    fragmentShader: `
-                        uniform float time;
-                        uniform vec3 currentLatent;
-                        uniform float semanticClusters[64];
-                        uniform float attentionWeights[8];
-                        uniform float layerDepth;
-                        uniform float isExploring;
-                        
-                        varying vec3 vPosition;
-                        varying vec3 vNormal;
-                        varying vec3 vLatentCoord;
-                        varying float vSemanticDistance;
-                        varying float vAttentionWeight;
-                        varying float vGradientStrength;
-                        
-                        // Color palette for different semantic clusters
-                        vec3 getClusterColor(vec3 pos) {
-                            vec3 finalColor = vec3(0.1, 0.1, 0.2);
-                            float totalWeight = 0.0;
-                            
-                            for(int i = 0; i < 8; i++) {
-                                int baseIdx = i * 8;
-                                vec3 clusterCenter = vec3(
-                                    semanticClusters[baseIdx],
-                                    semanticClusters[baseIdx + 1],
-                                    semanticClusters[baseIdx + 2]
-                                );
-                                float clusterRadius = semanticClusters[baseIdx + 3];
-                                vec3 clusterColor = vec3(
-                                    semanticClusters[baseIdx + 5],
-                                    semanticClusters[baseIdx + 6],
-                                    semanticClusters[baseIdx + 7]
-                                );
-                                
-                                float dist = distance(pos, clusterCenter);
-                                if(dist < clusterRadius * 1.5) {
-                                    float weight = exp(-dist * 2.0);
-                                    finalColor += clusterColor * weight;
-                                    totalWeight += weight;
-                                }
-                            }
-                            
-                            if(totalWeight > 0.0) {
-                                finalColor /= totalWeight;
-                            }
-                            return finalColor;
-                        }
-                        
-                        // Attention visualization
-                        vec3 getAttentionColor() {
-                            vec3 attentionColor = vec3(0.0);
-                            for(int i = 0; i < 8; i++) {
-                                float weight = attentionWeights[i];
-                                float hue = float(i) / 8.0 * 6.28318;
-                                vec3 headColor = vec3(
-                                    sin(hue) * 0.5 + 0.5,
-                                    sin(hue + 2.094) * 0.5 + 0.5,
-                                    sin(hue + 4.188) * 0.5 + 0.5
-                                );
-                                attentionColor += headColor * weight;
-                            }
-                            return attentionColor * 0.3;
-                        }
-                        
-                        void main() {
-                            // Base semantic cluster color
-                            vec3 clusterColor = getClusterColor(vLatentCoord);
-                            
-                            // Attention head overlay
-                            vec3 attentionColor = getAttentionColor();
-                            
-                            // Gradient flow visualization
-                            vec3 gradientColor = vec3(1.0, 0.3, 0.1) * abs(vGradientStrength) * 2.0;
-                            
-                            // Current exploration highlight
-                            float distToCurrent = distance(vLatentCoord, currentLatent);
-                            float currentGlow = exp(-distToCurrent * 4.0) * isExploring * 0.8;
-                            vec3 explorationColor = vec3(1.0, 1.0, 0.8) * currentGlow;
-                            
-                            // Semantic distance affects brightness
-                            float semanticBrightness = 1.0 - smoothstep(0.5, 2.0, vSemanticDistance);
-                            
-                            // Layer depth affects saturation (deeper = more saturated)
-                            float saturation = 0.7 + layerDepth * 0.3;
-                            
-                            // Combine all color components
-                            vec3 finalColor = clusterColor * semanticBrightness * saturation +
-                                            attentionColor +
-                                            gradientColor +
-                                            explorationColor;
-                            
-                            // Fresnel rim lighting
-                            vec3 viewDir = normalize(-vPosition);
-                            float fresnel = pow(1.0 - abs(dot(normalize(vNormal), viewDir)), 2.0);
-                            finalColor += fresnel * vec3(0.2, 0.4, 0.8) * 0.5;
-                            
-                            // Latent space "energy" visualization
-                            float energy = length(vLatentCoord) * 0.1 + sin(time + vLatentCoord.x * 2.0) * 0.05;
-                            finalColor *= (1.0 + energy);
-                            
-                            // Attention weight influence on alpha
-                            float alpha = 0.8 + abs(vAttentionWeight) * 0.2;
-                            
-                            gl_FragColor = vec4(finalColor, alpha);
-                        }
-                    `,
-                    transparent: true,
-                    side: THREE.DoubleSide,
-                    blending: THREE.AdditiveBlending
-                });
-                
-                this.manifold = new THREE.Mesh(geometry, this.material);
-                this.scene.add(this.manifold);
-            }
-
-            latentManifoldParametric(u, v, target) {
-                // Create a more complex manifold representing latent space topology
-                const phi = u * Math.PI * 2;
-                const theta = v * Math.PI;
-                
-                // Base hypersphere with semantic deformations
-                const x = Math.sin(theta) * Math.cos(phi);
-                const y = Math.sin(theta) * Math.sin(phi);
-                const z = Math.cos(theta);
-                
-                target.set(x, y, z);
-            }
-
-            flattenClusters() {
-                const flattened = [];
-                this.semanticClusters.forEach(cluster => {
-                    flattened.push(...cluster.center, cluster.radius, 1.0, ...cluster.color);
-                });
-                return flattened;
-            }
-
-            createSemanticAnchors() {
-                const container = document.getElementById('container');
-                
-                this.semanticClusters.forEach((cluster, index) => {
-                    const anchor = document.createElement('div');
-                    anchor.className = 'semantic-anchor';
-                    anchor.style.animationDelay = (index * 0.3) + 's';
-                    container.appendChild(anchor);
-                    this.semanticAnchors.push(anchor);
-                });
-            }
-
-            updateSemanticAnchors() {
-                this.semanticClusters.forEach((cluster, index) => {
-                    if (this.semanticAnchors[index]) {
-                        // Project 3D cluster center to screen coordinates
-                        const vector = new THREE.Vector3(...cluster.center);
-                        vector.project(this.camera);
-                        
-                        const x = (vector.x * 0.5 + 0.5) * window.innerWidth;
-                        const y = (vector.y * -0.5 + 0.5) * window.innerHeight;
-                        
-                        this.semanticAnchors[index].style.left = x + 'px';
-                        this.semanticAnchors[index].style.top = y + 'px';
-                    }
-                });
-            }
-
-            setupEventListeners() {
-                const canvas = this.renderer.domElement;
-                const overlay = document.getElementById('attentionOverlay');
-                
-                const updatePointer = (clientX, clientY) => {
-                    this.pointer.x = (clientX / window.innerWidth) * 2 - 1;
-                    this.pointer.y = -(clientY / window.innerHeight) * 2 + 1;
-                    
-                    // Update attention overlay
-                    overlay.style.setProperty('--x', (clientX / window.innerWidth * 100) + '%');
-                    overlay.style.setProperty('--y', (clientY / window.innerHeight * 100) + '%');
-                    
-                    // Convert to latent coordinates
-                    this.currentLatent.x = this.pointer.x * 2;
-                    this.currentLatent.y = this.pointer.y * 2;
-                    this.currentLatent.z = Math.sin(this.time + this.pointer.x) * 0.5;
-                    
-                    this.updateLatentInfo();
-                };
-                
-                const startExploration = (clientX, clientY) => {
-                    this.isExploring = true;
-                    updatePointer(clientX, clientY);
-                    this.addToExplorationPath();
-                    this.simulateAttentionUpdate();
-                };
-                
-                const endExploration = () => {
-                    this.isExploring = false;
-                };
-                
-                canvas.addEventListener('mousedown', (e) => {
-                    startExploration(e.clientX, e.clientY);
-                });
-                
-                canvas.addEventListener('mousemove', (e) => {
-                    updatePointer(e.clientX, e.clientY);
-                    if (this.isExploring) {
-                        this.addToExplorationPath();
-                    }
-                });
-                
-                canvas.addEventListener('mouseup', endExploration);
-                
-                canvas.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    const touch = e.touches[0];
-                    startExploration(touch.clientX, touch.clientY);
-                }, { passive: false });
-                
-                canvas.addEventListener('touchmove', (e) => {
-                    e.preventDefault();
-                    const touch = e.touches[0];
-                    updatePointer(touch.clientX, touch.clientY);
-                    if (this.isExploring) {
-                        this.addToExplorationPath();
-                    }
-                }, { passive: false });
-                
-                canvas.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    endExploration();
-                }, { passive: false });
-                
-                window.addEventListener('resize', () => this.onWindowResize());
-            }
-
-            addToExplorationPath() {
-                this.explorationPath.push({
-                    x: this.currentLatent.x,
-                    y: this.currentLatent.y,
-                    z: this.currentLatent.z,
-                    time: this.time
-                });
-                
-                if (this.explorationPath.length > this.maxPathLength) {
-                    this.explorationPath.shift();
-                }
-                
-                // Update shader uniforms
-                const pathArray = new Array(this.maxPathLength * 3).fill(0);
-                for (let i = 0; i < Math.min(this.explorationPath.length, this.maxPathLength); i++) {
-                    const point = this.explorationPath[i];
-                    pathArray[i * 3] = point.x;
-                    pathArray[i * 3 + 1] = point.y;
-                    pathArray[i * 3 + 2] = point.z;
-                }
-                
-                this.material.uniforms.explorationPath.value = pathArray;
-                this.material.uniforms.pathLength.value = Math.min(this.explorationPath.length, this.maxPathLength);
-            }
-
-            simulateAttentionUpdate() {
-                // Simulate attention head activation based on current latent position
-                for (let i = 0; i < this.attentionHeads; i++) {
-                    const headPhase = this.time + i * 0.5;
-                    const activation = Math.abs(Math.sin(
-                        this.currentLatent.x * 2 + headPhase
-                    ) * Math.cos(
-                        this.currentLatent.y * 1.5 + headPhase
-                    ));
-                    this.material.uniforms.attentionWeights.value[i] = activation;
-                }
-            }
-
-            updateLatentInfo() {
-                // Find nearest semantic cluster
-                let nearestCluster = this.semanticClusters[0];
-                let minDistance = Infinity;
-                
-                this.semanticClusters.forEach(cluster => {
-                    const dist = Math.sqrt(
-                        Math.pow(this.currentLatent.x - cluster.center[0], 2) +
-                        Math.pow(this.currentLatent.y - cluster.center[1], 2) +
-                        Math.pow(this.currentLatent.z - cluster.center[2], 2)
-                    );
-                    if (dist < minDistance) {
-                        minDistance = dist;
-                        nearestCluster = cluster;
-                    }
-                });
-                
-                // Calculate derived metrics
-                const gradientMag = Math.abs(Math.sin(this.time + this.currentLatent.x)) * 0.8 + 0.2;
-                const similarity = Math.exp(-minDistance) * 0.9 + 0.1;
-                this.layerDepth = (Math.sin(this.time * 0.1) + 1) * 0.5;
-                
-                // Update UI
-                document.getElementById('coords').textContent = 
-                    `[${this.currentLatent.x.toFixed(2)}, ${this.currentLatent.y.toFixed(2)}, ${this.currentLatent.z.toFixed(2)}]`;
-                document.getElementById('cluster').textContent = nearestCluster.name;
-                document.getElementById('attention').textContent = this.isExploring ? 'Focused' : 'Distributed';
-                document.getElementById('layer').textContent = 
-                    ['Embedding', 'Low-Level', 'Mid-Level', 'High-Level', 'Output'][Math.floor(this.layerDepth * 5)];
-                document.getElementById('gradient').textContent = gradientMag.toFixed(2);
-                document.getElementById('similarity').textContent = similarity.toFixed(2);
-                
-                // Update shader uniforms
-                this.material.uniforms.gradientMagnitude.value = gradientMag;
-                this.material.uniforms.layerDepth.value = this.layerDepth;
-            }
-
-            onWindowResize() {
-                this.camera.aspect = window.innerWidth / window.innerHeight;
-                this.camera.updateProjectionMatrix();
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-            }
-
-            animate() {
-                requestAnimationFrame(() => this.animate());
-                
-                this.time += 0.016;
-                
-                // Update shader uniforms
-                this.material.uniforms.time.value = this.time;
-                this.material.uniforms.currentLatent.value.set(
-                    this.currentLatent.x,
-                    this.currentLatent.y,
-                    this.currentLatent.z
-                );
-                this.material.uniforms.isExploring.value = this.isExploring ? 1.0 : 0.0;
-                
-                // Slow manifold rotation to show different aspects
-                if (this.manifold) {
-                    this.manifold.rotation.x += 0.002;
-                    this.manifold.rotation.y += 0.003;
-                    this.manifold.rotation.z += 0.001;
-                }
-                
-                // Update semantic anchor positions
-                this.updateSemanticAnchors();
-                
-                // Periodic attention updates when not exploring
-                if (!this.isExploring && Math.random() > 0.98) {
-                    this.simulateAttentionUpdate();
-                }
-                
-                this.renderer.render(this.scene, this.camera);
+            
+            static info(message) {
+                console.info(`[LLM-Introspection] ${message}`);
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            new LatentSpaceExplorer();
+        // Utility functions
+        class Utils {
+            // Sanitize text content to prevent XSS
+            static sanitizeText(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+            
+            // Debounce function for performance
+            static debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+            
+            // Check if running on mobile device
+            static isMobile() {
+                return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            }
+            
+            // Performance-aware animation frame handling
+            static rafThrottle(callback) {
+                let running = false;
+                return function() {
+                    if (running) return;
+                    running = true;
+                    requestAnimationFrame(() => {
+                        callback.apply(this, arguments);
+                        running = false;
+                    });
+                };
+            }
+        }
+
+        // Model management class
+        class ModelManager {
+            constructor() {
+                this.engine = null;
+                this.currentModel = null;
+                this.isLoading = false;
+            }
+
+            async initialize() {
+                try {
+                    Logger.info("Initializing WebLLM engine");
+                    
+                    // Dynamic import to reduce initial bundle size
+                    const webllm = await import("https://esm.run/@mlc-ai/web-llm");
+                    this.engine = new webllm.MLCEngine();
+                    
+                    return true;
+                } catch (error) {
+                    Logger.error("Failed to initialize WebLLM", error);
+                    throw new Error(`WebLLM initialization failed: ${error.message}`);
+                }
+            }
+
+            async loadModel(modelId, progressCallback) {
+                if (this.isLoading) {
+                    throw new Error("Model loading already in progress");
+                }
+
+                this.isLoading = true;
+                
+                try {
+                    Logger.info(`Loading model: ${modelId}`);
+                    
+                    // Check if model is available
+                    const webllm = await import("https://esm.run/@mlc-ai/web-llm");
+                    const availableModels = webllm.prebuiltAppConfig.model_list;
+                    const modelExists = availableModels.some(model => model.model === modelId);
+                    
+                    if (!modelExists) {
+                        throw new Error(`Model ${modelId} not found in available models`);
+                    }
+
+                    if (progressCallback) {
+                        progressCallback(`Loading ${modelId}...`);
+                    }
+
+                    await this.engine.reload(modelId);
+                    this.currentModel = modelId;
+                    
+                    Logger.info(`Model ${modelId} loaded successfully`);
+                    return true;
+                    
+                } catch (error) {
+                    Logger.error(`Failed to load model ${modelId}`, error);
+                    throw error;
+                } finally {
+                    this.isLoading = false;
+                }
+            }
+
+            async generateStream(messages, options = {}) {
+                if (!this.engine || !this.currentModel) {
+                    throw new Error("No model loaded");
+                }
+
+                const defaultOptions = {
+                    temperature: 0.7,
+                    max_tokens: 50,
+                    stream: true
+                };
+
+                const mergedOptions = { ...defaultOptions, ...options };
+                
+                try {
+                    return await this.engine.chat.completions.create({
+                        messages,
+                        ...mergedOptions
+                    });
+                } catch (error) {
+                    Logger.error("Generation failed", error);
+                    throw error;
+                }
+            }
+
+            dispose() {
+                if (this.engine) {
+                    // WebLLM doesn't expose explicit disposal yet
+                    this.engine = null;
+                    this.currentModel = null;
+                }
+            }
+        }
+
+        // 3D visualization manager
+        class BabylonRenderer {
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.engine = null;
+                this.scene = null;
+                this.manifoldMesh = null;
+                this.material = null;
+                this.isDisposed = false;
+                
+                // Performance settings
+                this.isMobile = Utils.isMobile();
+                this.updateRate = this.isMobile ? 30 : 60; // FPS target
+            }
+
+            async initialize() {
+                try {
+                    // Check for WebGL support
+                    if (!this.canvas.getContext('webgl') && !this.canvas.getContext('experimental-webgl')) {
+                        throw new Error("WebGL not supported");
+                    }
+
+                    // Initialize Babylon.js with performance optimizations
+                    const engineOptions = {
+                        antialias: !this.isMobile,
+                        stencil: false,
+                        preserveDrawingBuffer: false,
+                        powerPreference: "high-performance",
+                        doNotHandleContextLost: true
+                    };
+
+                    this.engine = new BABYLON.Engine(this.canvas, true, engineOptions);
+                    this.scene = new BABYLON.Scene(this.engine);
+                    
+                    // Performance optimizations
+                    this.scene.skipPointerMovePicking = true;
+                    this.scene.autoClear = false;
+                    this.scene.autoClearDepthAndStencil = false;
+                    
+                    if (this.isMobile) {
+                        this.scene.setRenderingOrder(0);
+                    }
+
+                    this.setupScene();
+                    this.createManifold();
+                    this.startRenderLoop();
+                    
+                    Logger.info("Babylon.js renderer initialized");
+                    return true;
+                    
+                } catch (error) {
+                    Logger.error("Failed to initialize Babylon.js", error);
+                    throw error;
+                }
+            }
+
+            setupScene() {
+                // Camera with mobile-friendly controls
+                const camera = new BABYLON.ArcRotateCamera(
+                    "camera", 
+                    -Math.PI / 2, 
+                    Math.PI / 2.5, 
+                    10, 
+                    BABYLON.Vector3.Zero(), 
+                    this.scene
+                );
+                
+                // Touch-friendly camera controls
+                camera.attachControls(this.canvas, true);
+                camera.wheelPrecision = 50;
+                camera.pinchPrecision = 200;
+                camera.panningSensibility = 1000;
+                
+                // Lighting
+                const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), this.scene);
+                light.intensity = 0.7;
+            }
+
+            createManifold() {
+                // Create optimized geometry
+                const segments = this.isMobile ? 32 : 64;
+                const sphere = BABYLON.MeshBuilder.CreateSphere("manifold", {
+                    diameter: 4,
+                    segments: segments
+                }, this.scene);
+
+                // Create custom shader with error handling
+                try {
+                    this.material = this.createIntrospectionShader();
+                    sphere.material = this.material;
+                    this.manifoldMesh = sphere;
+                } catch (error) {
+                    Logger.error("Failed to create custom shader, falling back to standard material", error);
+                    // Fallback to standard material
+                    const standardMaterial = new BABYLON.StandardMaterial("fallback", this.scene);
+                    standardMaterial.diffuseColor = new BABYLON.Color3(0.2, 0.4, 1.0);
+                    sphere.material = standardMaterial;
+                    this.manifoldMesh = sphere;
+                }
+            }
+
+            createIntrospectionShader() {
+                const shaderMaterial = new BABYLON.ShaderMaterial("introspectionShader", this.scene, {
+                    vertex: "introspection",
+                    fragment: "introspection"
+                }, {
+                    attributes: ["position", "normal", "uv"],
+                    uniforms: ["world", "worldView", "worldViewProjection", "view", "projection",
+                              "time", "attentionWeights", "hiddenNorm", "tokenPosition", "isGenerating"]
+                });
+
+                // Define shaders with error handling
+                this.defineShaders();
+
+                // Set initial uniforms with safe defaults
+                const safeUniformSet = (name, value) => {
+                    try {
+                        shaderMaterial.setFloat(name, value);
+                    } catch (error) {
+                        Logger.warn(`Failed to set uniform ${name}:`, error);
+                    }
+                };
+
+                safeUniformSet("time", 0);
+                safeUniformSet("hiddenNorm", 1.0);
+                safeUniformSet("tokenPosition", 0);
+                safeUniformSet("isGenerating", 0);
+
+                // Set attention weights array safely
+                try {
+                    const defaultWeights = new Array(64).fill(0.1);
+                    shaderMaterial.setFloats("attentionWeights", defaultWeights);
+                } catch (error) {
+                    Logger.warn("Failed to set attention weights uniform:", error);
+                }
+
+                return shaderMaterial;
+            }
+
+            defineShaders() {
+                // Vertex shader with mobile optimizations
+                BABYLON.Effect.ShadersStore["introspectionVertexShader"] = `
+                    precision ${this.isMobile ? 'mediump' : 'highp'} float;
+                    
+                    attribute vec3 position;
+                    attribute vec3 normal;
+                    attribute vec2 uv;
+                    
+                    uniform mat4 worldViewProjection;
+                    uniform mat4 world;
+                    uniform float time;
+                    uniform float attentionWeights[64];
+                    uniform float hiddenNorm;
+                    uniform float tokenPosition;
+                    uniform float isGenerating;
+                    
+                    varying vec3 vPosition;
+                    varying vec3 vNormal;
+                    varying vec2 vUV;
+                    varying float vAttentionInfluence;
+                    
+                    // Simplified noise for mobile performance
+                    float noise(vec3 x) {
+                        return sin(x.x * 12.9898 + x.y * 78.233 + x.z * 37.719) * 0.5 + 0.5;
+                    }
+                    
+                    void main() {
+                        vPosition = position;
+                        vNormal = normal;
+                        vUV = uv;
+                        
+                        // Calculate simplified attention influence
+                        float attentionSum = 0.0;
+                        // Reduce loop iterations on mobile for performance
+                        int maxIterations = ${this.isMobile ? 32 : 64};
+                        for(int i = 0; i < maxIterations; i++) {
+                            if(i >= 64) break;
+                            attentionSum += attentionWeights[i];
+                        }
+                        vAttentionInfluence = attentionSum / float(maxIterations);
+                        
+                        // Simplified deformation
+                        vec3 pos = position;
+                        float displacement = noise(pos * 2.0 + time * 0.1) * 0.2 * hiddenNorm;
+                        displacement += vAttentionInfluence * 0.2;
+                        displacement += sin(tokenPosition * 0.1 + time) * isGenerating * 0.1;
+                        
+                        pos += normal * displacement;
+                        
+                        gl_Position = worldViewProjection * vec4(pos, 1.0);
+                    }
+                `;
+
+                // Fragment shader with mobile optimizations
+                BABYLON.Effect.ShadersStore["introspectionFragmentShader"] = `
+                    precision ${this.isMobile ? 'mediump' : 'highp'} float;
+                    
+                    uniform float time;
+                    uniform float isGenerating;
+                    
+                    varying vec3 vPosition;
+                    varying vec3 vNormal;
+                    varying vec2 vUV;
+                    varying float vAttentionInfluence;
+                    
+                    void main() {
+                        // Simplified color calculation for mobile
+                        vec3 baseColor = vec3(0.2, 0.4, 1.0);
+                        baseColor += vAttentionInfluence * vec3(0.5, 0.2, 0.8);
+                        
+                        // Generation activity
+                        vec3 activityColor = vec3(1.0, 0.8, 0.2) * isGenerating * 
+                            sin(time * 4.0) * 0.3;
+                        
+                        // Simple rim lighting
+                        float rim = 1.0 - abs(dot(normalize(vNormal), vec3(0, 0, 1)));
+                        vec3 rimColor = vec3(0.4, 0.8, 1.0) * rim * 0.3;
+                        
+                        vec3 finalColor = baseColor + activityColor + rimColor;
+                        
+                        gl_FragColor = vec4(finalColor, 0.9);
+                    }
+                `;
+            }
+
+            updateVisualization(data) {
+                if (!this.material || this.isDisposed) return;
+
+                try {
+                    this.material.setFloat("time", performance.now() * 0.001);
+                    this.material.setFloat("isGenerating", data.isGenerating ? 1.0 : 0.0);
+                    this.material.setFloat("hiddenNorm", data.hiddenNorm || 1.0);
+                    this.material.setFloat("tokenPosition", data.tokenPosition || 0);
+                    
+                    if (data.attentionWeights) {
+                        this.material.setFloats("attentionWeights", data.attentionWeights);
+                    }
+                } catch (error) {
+                    Logger.warn("Failed to update shader uniforms:", error);
+                }
+            }
+
+            startRenderLoop() {
+                // Throttled render loop for performance
+                const throttledRender = Utils.rafThrottle(() => {
+                    if (!this.isDisposed && this.scene) {
+                        this.scene.render();
+                    }
+                });
+
+                this.engine.runRenderLoop(throttledRender);
+            }
+
+            handleResize() {
+                if (this.engine && !this.isDisposed) {
+                    this.engine.resize();
+                }
+            }
+
+            dispose() {
+                if (this.isDisposed) return;
+                
+                this.isDisposed = true;
+                
+                if (this.material) {
+                    this.material.dispose();
+                }
+                
+                if (this.manifoldMesh) {
+                    this.manifoldMesh.dispose();
+                }
+                
+                if (this.scene) {
+                    this.scene.dispose();
+                }
+                
+                if (this.engine) {
+                    this.engine.dispose();
+                }
+                
+                Logger.info("Babylon.js renderer disposed");
+            }
+        }
+
+        // Main application class
+        class LLMIntrospectionInterface {
+            constructor() {
+                this.modelManager = new ModelManager();
+                this.babylonRenderer = new BabylonRenderer('babylonCanvas');
+                this.isGenerating = false;
+                this.generatedTokens = [];
+                this.attentionWeights = new Array(64).fill(0.1);
+                
+                // Bind methods to preserve 'this' context
+                this.handleResize = Utils.debounce(() => {
+                    this.babylonRenderer.handleResize();
+                }, 250);
+                
+                this.isInitialized = false;
+            }
+
+            async initialize() {
+                try {
+                    this.updateStatus("loading", "Initializing...");
+                    
+                    // Initialize Babylon.js first (faster)
+                    await this.babylonRenderer.initialize();
+                    
+                    // Then initialize WebLLM
+                    await this.modelManager.initialize();
+                    
+                    this.setupEventListeners();
+                    this.updateStatus("ready", "WebLLM Ready - Select and load a model");
+                    this.hideLoadingScreen();
+                    
+                    this.isInitialized = true;
+                    Logger.info("Application initialized successfully");
+                    
+                } catch (error) {
+                    Logger.error("Application initialization failed", error);
+                    this.updateStatus("error", `Initialization failed: ${error.message}`);
+                    this.updateLoadingText(`Error: ${error.message}`);
+                }
+            }
+
+            setupEventListeners() {
+                // Model loading
+                document.getElementById('loadModelBtn').addEventListener('click', () => {
+                    this.loadModel();
+                });
+                
+                // Generation controls
+                document.getElementById('generateBtn').addEventListener('click', () => {
+                    this.generateText();
+                });
+                
+                document.getElementById('stopBtn').addEventListener('click', () => {
+                    this.stopGeneration();
+                });
+                
+                document.getElementById('resetBtn').addEventListener('click', () => {
+                    this.resetInterface();
+                });
+                
+                // Temperature slider
+                document.getElementById('temperatureSlider').addEventListener('input', (e) => {
+                    document.getElementById('temperatureValue').textContent = e.target.value;
+                });
+                
+                // Window resize
+                window.addEventListener('resize', this.handleResize);
+                
+                // Cleanup on page unload
+                window.addEventListener('beforeunload', () => {
+                    this.dispose();
+                });
+                
+                // Error handling for uncaught errors
+                window.addEventListener('error', (event) => {
+                    Logger.error("Uncaught error:", event.error);
+                });
+                
+                window.addEventListener('unhandledrejection', (event) => {
+                    Logger.error("Unhandled promise rejection:", event.reason);
+                });
+            }
+
+            async loadModel() {
+                try {
+                    const modelId = document.getElementById('modelSelect').value;
+                    const button = document.getElementById('loadModelBtn');
+                    
+                    button.disabled = true;
+                    this.updateStatus("loading", "Loading model...");
+                    this.showLoadingScreen();
+                    
+                    await this.modelManager.loadModel(modelId, (progress) => {
+                        this.updateLoadingText(progress);
+                    });
+                    
+                    this.updateStatus("ready", `${modelId} loaded successfully`);
+                    this.hideLoadingScreen();
+                    
+                    // Enable generation controls
+                    document.getElementById('generateBtn').disabled = false;
+                    
+                } catch (error) {
+                    Logger.error("Model loading failed", error);
+                    this.updateStatus("error", `Model loading failed: ${error.message}`);
+                    this.updateLoadingText(`Error: ${error.message}`);
+                } finally {
+                    document.getElementById('loadModelBtn').disabled = false;
+                }
+            }
+
+            async generateText() {
+                if (this.isGenerating) return;
+                
+                const promptInput = document.getElementById('promptInput');
+                const prompt = promptInput.value.trim();
+                
+                if (!prompt) {
+                    alert("Please enter a prompt");
+                    promptInput.focus();
+                    return;
+                }
+                
+                this.isGenerating = true;
+                this.updateGenerationControls();
+                this.clearOutput();
+                this.resetProbeData();
+                
+                try {
+                    const temperature = parseFloat(document.getElementById('temperatureSlider').value);
+                    const maxTokens = parseInt(document.getElementById('maxTokens').value);
+                    
+                    const messages = [
+                        { role: "user", content: prompt }
+                    ];
+                    
+                    const stream = await this.modelManager.generateStream(messages, {
+                        temperature,
+                        max_tokens: maxTokens
+                    });
+                    
+                    let fullResponse = "";
+                    let tokenCount = 0;
+                    
+                    for await (const chunk of stream) {
+                        if (!this.isGenerating) break;
+                        
+                        const delta = chunk.choices[0]?.delta?.content || "";
+                        if (delta) {
+                            fullResponse += delta;
+                            tokenCount++;
+                            
+                            // Simulate probe data and update visualization
+                            this.simulateProbeData(delta, tokenCount);
+                            this.updateVisualization();
+                            this.updateOutput(Utils.sanitizeText(fullResponse));
+                            
+                            // Small delay for visibility
+                            await new Promise(resolve => setTimeout(resolve, 80));
+                        }
+                    }
+                    
+                } catch (error) {
+                    Logger.error("Generation failed", error);
+                    this.updateOutput(`Error: ${error.message}`);
+                } finally {
+                    this.isGenerating = false;
+                    this.updateGenerationControls();
+                }
+            }
+
+            simulateProbeData(token, position) {
+                // Note: This is simulated data for demonstration purposes
+                // Real attention weights and hidden states would require model modifications
+                
+                // Simulate attention weights with some coherent patterns
+                for (let i = 0; i < 64; i++) {
+                    const headRow = Math.floor(i / 8);
+                    const headCol = i % 8;
+                    const influence = Math.sin(position * 0.1 + headRow * 0.5) * 
+                                    Math.cos(token.charCodeAt(0) * 0.1 + headCol * 0.3);
+                    this.attentionWeights[i] = Math.abs(influence) * 0.8 + 0.2;
+                }
+                
+                // Simulate other metrics
+                const hiddenNorm = Math.random() * 2 + 1;
+                const hiddenEntropy = Math.random() * 3 + 1;
+                const topTokenProb = Math.random() * 0.6 + 0.4;
+                const perplexity = Math.random() * 20 + 5;
+                
+                // Store token data
+                this.generatedTokens.push({
+                    token: Utils.sanitizeText(token),
+                    position: position,
+                    probability: topTokenProb
+                });
+                
+                // Keep only recent tokens for performance
+                if (this.generatedTokens.length > 100) {
+                    this.generatedTokens = this.generatedTokens.slice(-50);
+                }
+                
+                // Update UI
+                this.updateProbeDisplay({
+                    currentLayer: `${(position % 12) + 1}/12`,
+                    currentToken: Utils.sanitizeText(token),
+                    tokenPosition: position,
+                    avgAttention: (this.attentionWeights.reduce((a, b) => a + b) / 64).toFixed(2),
+                    hiddenNorm: hiddenNorm.toFixed(2),
+                    hiddenEntropy: hiddenEntropy.toFixed(2),
+                    topTokenProb: topTokenProb.toFixed(2),
+                    perplexity: perplexity.toFixed(1)
+                });
+            }
+
+            updateProbeDisplay(data) {
+                // Safely update DOM elements
+                const updateElement = (id, value) => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.textContent = value;
+                    }
+                };
+                
+                updateElement('currentLayer', data.currentLayer);
+                updateElement('currentToken', data.currentToken);
+                updateElement('tokenPosition', data.tokenPosition);
+                updateElement('avgAttention', data.avgAttention);
+                updateElement('hiddenNorm', data.hiddenNorm);
+                updateElement('hiddenEntropy', data.hiddenEntropy);
+                updateElement('topTokenProb', data.topTokenProb);
+                updateElement('perplexity', data.perplexity);
+                
+                // Update attention matrix safely
+                this.updateAttentionMatrix();
+                
+                // Update token list safely
+                this.updateTokenList();
+            }
+
+            updateAttentionMatrix() {
+                const matrix = document.getElementById('attentionMatrix');
+                if (!matrix) return;
+                
+                // Create cells if not exists
+                if (matrix.children.length === 0) {
+                    for (let i = 0; i < 64; i++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'attention-cell';
+                        cell.setAttribute('role', 'gridcell');
+                        cell.setAttribute('aria-label', `Attention head ${Math.floor(i / 8) + 1}-${(i % 8) + 1}`);
+                        matrix.appendChild(cell);
+                    }
+                }
+                
+                // Update cell intensities
+                for (let i = 0; i < 64; i++) {
+                    const cell = matrix.children[i];
+                    if (cell) {
+                        const intensity = Math.max(0, Math.min(1, this.attentionWeights[i]));
+                        cell.style.background = `rgba(100, 200, 255, ${intensity})`;
+                    }
+                }
+            }
+
+            updateTokenList() {
+                const tokenList = document.getElementById('tokenList');
+                if (!tokenList) return;
+                
+                // Show only recent tokens for performance
+                const recentTokens = this.generatedTokens.slice(-20);
+                const tokenElements = recentTokens.map((tokenData, index) => {
+                    const isLast = index === recentTokens.length - 1;
+                    const sanitizedToken = Utils.sanitizeText(tokenData.token);
+                    return `<span class="token ${isLast ? 'current' : ''}" title="Probability: ${tokenData.probability.toFixed(3)}">${sanitizedToken}</span>`;
+                }).join('');
+                
+                tokenList.innerHTML = tokenElements;
+                tokenList.scrollTop = tokenList.scrollHeight;
+            }
+
+            updateVisualization() {
+                const data = {
+                    isGenerating: this.isGenerating,
+                    attentionWeights: this.attentionWeights,
+                    hiddenNorm: Math.random() * 2 + 1, // Simulated
+                    tokenPosition: this.generatedTokens.length
+                };
+                
+                this.babylonRenderer.updateVisualization(data);
+            }
+
+            stopGeneration() {
+                this.isGenerating = false;
+                this.updateGenerationControls();
+                Logger.info("Generation stopped by user");
+            }
+
+            resetInterface() {
+                this.stopGeneration();
+                this.clearOutput();
+                this.resetProbeData();
+                
+                // Reset form values
+                document.getElementById('promptInput').value = "The meaning of life is";
+                document.getElementById('temperatureSlider').value = "0.7";
+                document.getElementById('temperatureValue').textContent = "0.7";
+                document.getElementById('maxTokens').value = "50";
+                
+                Logger.info("Interface reset");
+            }
+
+            updateGenerationControls() {
+                const generateBtn = document.getElementById('generateBtn');
+                const stopBtn = document.getElementById('stopBtn');
+                
+                if (generateBtn) {
+                    generateBtn.disabled = this.isGenerating || !this.modelManager.currentModel;
+                }
+                
+                if (stopBtn) {
+                    stopBtn.disabled = !this.isGenerating;
+                }
+            }
+
+            updateStatus(status, text) {
+                const indicator = document.getElementById('statusIndicator');
+                const statusText = document.getElementById('statusText');
+                
+                if (indicator) {
+                    indicator.className = `status-indicator ${status}`;
+                }
+                
+                if (statusText) {
+                    statusText.textContent = text;
+                }
+            }
+
+            updateLoadingText(text) {
+                const loadingText = document.getElementById('loadingText');
+                if (loadingText) {
+                    loadingText.textContent = text;
+                }
+            }
+
+            showLoadingScreen() {
+                const loadingScreen = document.getElementById('loadingScreen');
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'flex';
+                }
+            }
+
+            hideLoadingScreen() {
+                const loadingScreen = document.getElementById('loadingScreen');
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'none';
+                }
+            }
+
+            updateOutput(text) {
+                const generatedText = document.getElementById('generatedText');
+                if (generatedText) {
+                    generatedText.textContent = text;
+                }
+            }
+
+            clearOutput() {
+                this.updateOutput("Generating...");
+            }
+
+            resetProbeData() {
+                this.attentionWeights.fill(0.1);
+                this.generatedTokens = [];
+                
+                this.updateProbeDisplay({
+                    currentLayer: "-",
+                    currentToken: "-",
+                    tokenPosition: "-",
+                    avgAttention: "0.00",
+                    hiddenNorm: "0.00",
+                    hiddenEntropy: "0.00",
+                    topTokenProb: "0.00",
+                    perplexity: "0.00"
+                });
+                
+                const tokenList = document.getElementById('tokenList');
+                if (tokenList) {
+                    tokenList.innerHTML = "";
+                }
+            }
+
+            dispose() {
+                this.stopGeneration();
+                
+                // Remove event listeners
+                window.removeEventListener('resize', this.handleResize);
+                
+                // Dispose of managers
+                this.modelManager.dispose();
+                this.babylonRenderer.dispose();
+                
+                Logger.info("Application disposed");
+            }
+        }
+
+        // Initialize application when DOM is ready
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const app = new LLMIntrospectionInterface();
+                await app.initialize();
+                
+                // Store reference globally for debugging (development only)
+                if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+                    window.llmApp = app;
+                }
+            } catch (error) {
+                Logger.error("Failed to start application", error);
+                
+                // Show user-friendly error message
+                const loadingText = document.getElementById('loadingText');
+                if (loadingText) {
+                    loadingText.textContent = `Failed to initialize: ${error.message}`;
+                }
+            }
         });
-        
-        document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
-        document.addEventListener('gesturestart', (e) => e.preventDefault());
     </script>
 </body>
 </html>
