@@ -686,11 +686,15 @@
                     </label>
                     <select class="form-input" id="modelSelect">
                         <option value="">Select a model...</option>
-                        <option value="Phi-2-GGUF">Phi-2 (2.7B) - Microsoft Research</option>
-                        <option value="TinyLlama-1.1B-Chat-v0.4-q4f16_1-1k">TinyLlama (1.1B) - Fast inference</option>
+                        <option value="TinyLlama-1.1B-Chat-v0.4-q4f16_1">TinyLlama (1.1B) - Fast inference</option>
+                        <option value="Phi-2-q4f16_1">Phi-2 (2.7B) - Microsoft Research</option>
+                        <option value="Llama-2-7b-chat-hf-q4f16_1">Llama-2-7B-Chat (7B) - Larger model</option>
                     </select>
                     <button class="btn primary" id="loadModelBtn" style="margin-top: 8px;">
                         Load Model
+                    </button>
+                    <button class="btn" id="refreshModelsBtn" style="margin-top: 4px; font-size: 10px;">
+                        Refresh Available Models
                     </button>
                 </div>
 
@@ -1084,8 +1088,12 @@
                     this.setupEventListeners();
                     this.updateUI();
                     
+                    // Automatically refresh available models
+                    this.updateLoadingText('Loading available models...', 'Checking model catalog');
+                    await this.refreshAvailableModels();
+                    
                     this.hideLoadingScreen();
-                    this.updateModelStatus('WebLLM ready - select a model');
+                    this.updateModelStatus('WebLLM ready - select a model to begin');
                     document.getElementById('experimentId').textContent = this.experimentId;
                     
                 } catch (error) {
@@ -1098,6 +1106,10 @@
                 // Model loading
                 document.getElementById('loadModelBtn').addEventListener('click', () => {
                     this.loadModel();
+                });
+
+                document.getElementById('refreshModelsBtn').addEventListener('click', () => {
+                    this.refreshAvailableModels();
                 });
 
                 // Generation
@@ -1135,6 +1147,45 @@
                 });
             }
 
+            async refreshAvailableModels() {
+                try {
+                    this.updateModelStatus('Checking available models...');
+                    
+                    // Import webllm to get the prebuilt models list
+                    const webllm = await import("https://esm.run/@mlc-ai/web-llm");
+                    
+                    // Get available models from prebuilt config
+                    const availableModels = webllm.prebuiltAppConfig.model_list;
+                    
+                    // Update dropdown with available models
+                    const select = document.getElementById('modelSelect');
+                    select.innerHTML = '<option value="">Select a model...</option>';
+                    
+                    // Filter for smaller models suitable for research
+                    const suitableModels = availableModels.filter(model => {
+                        const modelId = model.model_id || model.model;
+                        return modelId.includes('TinyLlama') || 
+                               modelId.includes('Phi') || 
+                               modelId.includes('Llama-2-7b') ||
+                               modelId.includes('gemma');
+                    }).slice(0, 10); // Limit to first 10 suitable models
+                    
+                    suitableModels.forEach(model => {
+                        const modelId = model.model_id || model.model;
+                        const option = document.createElement('option');
+                        option.value = modelId;
+                        option.textContent = `${modelId} (${model.model_lib || 'Unknown size'})`;
+                        select.appendChild(option);
+                    });
+                    
+                    this.updateModelStatus(`Found ${suitableModels.length} available models`);
+                    
+                } catch (error) {
+                    console.error('Failed to refresh models:', error);
+                    this.updateModelStatus('Failed to refresh models');
+                }
+            }
+
             async loadModel() {
                 try {
                     const modelId = document.getElementById('modelSelect').value;
@@ -1145,9 +1196,24 @@
 
                     this.updateModelStatus('Loading model...');
                     this.showLoadingScreen();
-                    this.updateLoadingText(`Loading ${modelId}...`, 'This may take several minutes');
+                    this.updateLoadingText(`Loading ${modelId}...`, 'This may take several minutes on first load');
                     
-                    await this.engine.reload(modelId);
+                    try {
+                        // Try loading with progress callback (newer WebLLM versions)
+                        await this.engine.reload(modelId, undefined, (progress) => {
+                            if (progress && progress.progress !== undefined) {
+                                this.updateLoadingText(
+                                    `Loading ${modelId}...`, 
+                                    `Progress: ${(progress.progress * 100).toFixed(1)}%`
+                                );
+                            }
+                        });
+                    } catch (progressError) {
+                        // Fallback to simple reload (older WebLLM versions)
+                        console.log('Progress callback not supported, using simple reload');
+                        await this.engine.reload(modelId);
+                    }
+                    
                     this.currentModel = modelId;
                     
                     this.hideLoadingScreen();
@@ -1158,7 +1224,13 @@
                     console.error('Model loading failed:', error);
                     this.updateModelStatus('Model loading failed');
                     this.hideLoadingScreen();
-                    alert(`Failed to load model: ${error.message}`);
+                    
+                    // Provide more helpful error message
+                    let errorMessage = `Failed to load model: ${error.message}`;
+                    if (error.message.includes('Cannot find model record')) {
+                        errorMessage += '\n\nTry clicking "Refresh Available Models" to see current options.';
+                    }
+                    alert(errorMessage);
                 }
             }
 
