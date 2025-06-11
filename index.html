@@ -23,7 +23,6 @@
         <header class="header" role="banner">
             <div class="app-title">
                 <h1>LLM Probability Analyzer</h1>
-                <span class="professional-badge">Professional</span>
             </div>
             <div class="model-status">
                 <span class="status-indicator" id="statusIndicator" aria-label="Model status" title="System status"></span>
@@ -33,119 +32,106 @@
 
         <!-- Configuration Controls -->
         <aside class="controls-panel" role="complementary" aria-label="Analysis configuration">
-            <div class="panel-header">
-                <h3>Analysis Configuration</h3>
-                <p>Configure parameters for probability analysis</p>
-            </div>
-            <div class="panel-content">
-                <!-- Model Selection -->
-                <div class="form-group">
-                    <label class="form-label" for="modelSelect">Model Selection</label>
-                    <select class="form-input" id="modelSelect" aria-describedby="modelError">
-                        <option value="">Select a model...</option>
+            <!-- Stage 1: Setup -->
+            <section class="config-stage">
+                <h3 class="stage-title">
+                    <span class="stage-number">1</span>
+                    Model Setup
+                </h3>
+                <div class="stage-content">
+                    <select class="clean-select" id="modelSelect" aria-describedby="modelError">
+                        <option value="">Choose model...</option>
                     </select>
-                    <div class="validation-error" id="modelError" role="alert">Please select a valid model</div>
-                    <button class="btn primary" id="loadModelBtn" aria-describedby="loadProgress">
-                        <span>Load Model</span>
-                        <div class="btn-progress" id="loadProgress" style="width: 0%;" aria-hidden="true"></div>
-                    </button>
-                    <button class="btn" id="refreshModelsBtn">
-                        <span>🔄</span>
-                        Refresh Available Models
-                    </button>
-                </div>
-
-                <!-- Analysis Prompt -->
-                <div class="form-group">
-                    <label class="form-label" for="promptInput">Analysis Prompt</label>
-                    <textarea 
-                        class="form-input form-textarea" 
-                        id="promptInput" 
-                        placeholder="Enter text for probability analysis..."
-                        aria-describedby="promptError promptHelp"
-                        maxlength="1000"
-                        rows="4">The transformer architecture uses attention mechanisms to</textarea>
-                    <div class="validation-error" id="promptError" role="alert">Prompt cannot be empty</div>
-                    <div id="promptHelp" class="sr-only">Enter the text you want the model to continue. This will be used for probability analysis.</div>
-                </div>
-
-                <!-- Temperature Control -->
-                <div class="form-group">
-                    <label class="form-label" for="tempSlider">
-                        Temperature: <span id="tempValue" aria-live="polite">1.0</span>
-                        <span class="help-tooltip" title="Controls randomness: 0.1=focused, 2.0=creative">ℹ️</span>
-                    </label>
-                    <div class="slider-group">
-                        <input type="range" class="slider" id="tempSlider" 
-                               min="0.1" max="2.0" step="0.1" value="1.0"
-                               aria-describedby="tempError"
-                               aria-label="Temperature setting">
-                        <span class="slider-value" id="tempDisplay">1.0</span>
+                    <div class="validation-error" id="modelError" role="alert">Please select a model</div>
+                    
+                    <div class="button-group">
+                        <button class="btn-primary" id="loadModelBtn">
+                            <span>Load Model</span>
+                            <div class="btn-progress" id="loadProgress" style="width: 0%;"></div>
+                        </button>
+                        <button class="btn-ghost" id="refreshModelsBtn" title="Refresh model list">
+                            ↻
+                        </button>
                     </div>
-                    <div class="validation-error" id="tempError" role="alert">Temperature must be between 0.1 and 2.0</div>
                 </div>
+            </section>
 
-                <!-- Max Tokens -->
-                <div class="form-group">
-                    <label class="form-label" for="maxTokens">
-                        Max Tokens
-                        <span class="help-tooltip" title="Number of tokens to generate for analysis (5-50)">ℹ️</span>
-                    </label>
-                    <input type="number" class="form-input" id="maxTokens" 
-                           min="5" max="50" value="20"
-                           aria-describedby="tokensError">
-                    <div class="validation-error" id="tokensError" role="alert">Max tokens must be between 5 and 50</div>
-                </div>
-
-                <!-- Top-K Alternatives -->
-                <div class="form-group">
-                    <label class="form-label" for="topKSlider">
-                        Top-K Alternatives: <span id="topKValue" aria-live="polite">5</span>
-                        <span class="help-tooltip" title="Number of alternative tokens to analyze (3-10)">ℹ️</span>
-                    </label>
-                    <div class="slider-group">
-                        <input type="range" class="slider" id="topKSlider" 
-                               min="3" max="10" step="1" value="5"
-                               aria-describedby="topKError"
-                               aria-label="Top-K alternatives setting">
-                        <span class="slider-value" id="topKDisplay">5</span>
+            <!-- Stage 2: Configuration -->
+            <section class="config-stage">
+                <h3 class="stage-title">
+                    <span class="stage-number">2</span>
+                    Analysis Setup
+                </h3>
+                <div class="stage-content">
+                    <div class="input-group">
+                        <label class="clean-label">Input Text</label>
+                        <textarea 
+                            class="clean-textarea" 
+                            id="promptInput" 
+                            placeholder="Enter text for analysis..."
+                            rows="3">The transformer architecture uses attention mechanisms to</textarea>
+                        <div class="validation-error" id="promptError" role="alert">Text required</div>
                     </div>
-                    <div class="validation-error" id="topKError" role="alert">Top-K must be between 3 and 10</div>
-                </div>
 
-                <!-- Generation Controls -->
-                <div class="form-group">
-                    <button class="btn primary" id="generateBtn" disabled aria-describedby="generateProgress">
-                        <span>Generate & Analyze</span>
-                        <div class="btn-progress" id="generateProgress" style="width: 0%;" aria-hidden="true"></div>
-                    </button>
-                    <button class="btn warning" id="stopBtn" disabled>
-                        <span>⏹️</span>
-                        Stop Generation
-                    </button>
-                </div>
-
-                <!-- Advanced Options -->
-                <div class="form-group">
-                    <details>
-                        <summary class="form-label" style="cursor: pointer;">Advanced Options</summary>
-                        <div style="margin-top: 8px;">
-                            <label class="form-label">
-                                <input type="checkbox" id="debugMode" style="margin-right: 6px;">
-                                Show Inference Debug Log
-                            </label>
-                            <label class="form-label">
-                                <input type="checkbox" id="autoExport" style="margin-right: 6px;">
-                                Auto-export Results
-                            </label>
-                            <label class="form-label">
-                                <input type="checkbox" id="verboseMode" style="margin-right: 6px;">
-                                Verbose Analysis
-                            </label>
+                    <div class="params-grid">
+                        <div class="param-item">
+                            <label class="param-label">Temperature</label>
+                            <div class="param-control">
+                                <input type="range" class="clean-slider" id="tempSlider" 
+                                       min="0.1" max="2.0" step="0.1" value="1.0">
+                                <span class="param-value" id="tempValue">1.0</span>
+                            </div>
                         </div>
-                    </details>
+
+                        <div class="param-item">
+                            <label class="param-label">Max Tokens</label>
+                            <div class="param-control">
+                                <input type="number" class="clean-input" id="maxTokens" 
+                                       min="5" max="50" value="20">
+                            </div>
+                        </div>
+
+                        <div class="param-item">
+                            <label class="param-label">Alternatives</label>
+                            <div class="param-control">
+                                <input type="range" class="clean-slider" id="topKSlider" 
+                                       min="3" max="10" step="1" value="5">
+                                <span class="param-value" id="topKValue">5</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </section>
+
+            <!-- Stage 3: Analysis -->
+            <section class="config-stage">
+                <h3 class="stage-title">
+                    <span class="stage-number">3</span>
+                    Generate
+                </h3>
+                <div class="stage-content">
+                    <div class="action-group">
+                        <button class="btn-primary btn-large" id="generateBtn" disabled>
+                            <span>Analyze Probabilities</span>
+                            <div class="btn-progress" id="generateProgress" style="width: 0%;"></div>
+                        </button>
+                        <button class="btn-stop" id="stopBtn" disabled>Stop</button>
+                    </div>
+                    
+                    <div class="quick-options">
+                        <label class="option-toggle">
+                            <input type="checkbox" id="debugMode">
+                            <span class="toggle-slider"></span>
+                            Debug Log
+                        </label>
+                        <label class="option-toggle">
+                            <input type="checkbox" id="autoExport">
+                            <span class="toggle-slider"></span>
+                            Auto Export
+                        </label>
+                    </div>
+                </div>
+            </section>
         </aside>
 
         <!-- Visualization Area -->
@@ -176,111 +162,124 @@
 
         <!-- Results Panel -->
         <section class="results-panel" role="complementary" aria-label="Analysis results">
-            <div class="results-tabs" role="tablist">
-                <button class="tab active" data-tab="metrics" role="tab" aria-selected="true" aria-controls="metrics-content">Metrics</button>
-                <button class="tab" data-tab="sequence" role="tab" aria-selected="false" aria-controls="sequence-content">Sequence</button>
-                <button class="tab" data-tab="analysis" role="tab" aria-selected="false" aria-controls="analysis-content">Analysis</button>
-                <button class="tab" data-tab="export" role="tab" aria-selected="false" aria-controls="export-content">Export</button>
-            </div>
-
-            <!-- Metrics Tab -->
-            <div class="tab-content active" id="metrics-content" role="tabpanel" aria-labelledby="metrics-tab">
-                <div class="metrics-grid">
-                    <div class="metric-card uncertainty-low" id="entropyCard">
-                        <div class="metric-value" id="currentEntropy" aria-label="Current entropy value">0.00</div>
-                        <div class="metric-label">Entropy (bits)</div>
-                    </div>
-                    <div class="metric-card uncertainty-low" id="confidenceCard">
-                        <div class="metric-value" id="currentConfidence" aria-label="Current confidence percentage">0%</div>
-                        <div class="metric-label">Confidence</div>
-                    </div>
-                    <div class="metric-card uncertainty-low" id="surprisalCard">
-                        <div class="metric-value" id="currentSurprisal" aria-label="Current surprisal value">0.0</div>
-                        <div class="metric-label">Surprisal</div>
-                    </div>
-                    <div class="metric-card uncertainty-low" id="perplexityCard">
-                        <div class="metric-value" id="currentPerplexity" aria-label="Current perplexity value">0.0</div>
-                        <div class="metric-label">Perplexity</div>
-                    </div>
-                </div>
-                <div class="probability-details" id="probabilityDetails" aria-live="polite">
-                    Ready to analyze token probabilities. Load a model and generate text to see real-time probability distributions.
+            <div class="results-header">
+                <h3>Analysis Results</h3>
+                <div class="results-nav">
+                    <button class="nav-tab active" data-tab="live" role="tab">Live</button>
+                    <button class="nav-tab" data-tab="tokens" role="tab">Tokens</button>
+                    <button class="nav-tab" data-tab="stats" role="tab">Stats</button>
+                    <button class="nav-tab" data-tab="export" role="tab">Export</button>
                 </div>
             </div>
 
-            <!-- Sequence Tab -->
-            <div class="tab-content" id="sequence-content" role="tabpanel" aria-labelledby="sequence-tab">
-                <div class="token-sequence">
-                    <div class="sequence-header">Generated Token Sequence</div>
-                    <div class="token-stream" id="tokenStream" role="list" aria-label="Generated tokens"></div>
-                    <div style="font-size: 10px; color: var(--text-secondary); margin-top: 6px;">
-                        Click tokens to see alternatives • 
-                        <span style="color: var(--uncertainty-high);">Red</span> = high uncertainty • 
-                        <span style="color: var(--uncertainty-med);">Orange</span> = medium uncertainty
+            <!-- Live Metrics -->
+            <div class="tab-content active" id="live-content" role="tabpanel">
+                <div class="metrics-overview">
+                    <div class="metric-item">
+                        <div class="metric-value" id="currentEntropy">0.00</div>
+                        <div class="metric-name">Entropy</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="currentConfidence">0%</div>
+                        <div class="metric-name">Confidence</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="currentSurprisal">0.0</div>
+                        <div class="metric-name">Surprisal</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-value" id="currentPerplexity">0.0</div>
+                        <div class="metric-name">Perplexity</div>
                     </div>
                 </div>
-                <div class="alternative-tokens" id="alternativeTokens" aria-live="polite"></div>
-            </div>
-
-            <!-- Analysis Tab -->
-            <div class="tab-content" id="analysis-content" role="tabpanel" aria-labelledby="analysis-tab">
-                <div id="statisticalAnalysis">
-                    <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">
-                        Statistical Analysis (requires &gt;5 tokens)
-                    </div>
-                    <div id="statsResults" aria-live="polite">
-                        Generate tokens to see statistical analysis of uncertainty patterns.
-                    </div>
-                </div>
-                <div id="performanceMetrics" style="margin-top: 16px;">
-                    <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px;">
-                        Performance Metrics
-                    </div>
-                    <div id="perfResults">
-                        <div>Generation Time: <span id="generationTime">-</span></div>
-                        <div>Tokens/Second: <span id="tokensPerSecond">-</span></div>
-                        <div>Average Processing Time: <span id="avgProcessingTime">-</span></div>
+                
+                <div class="current-analysis" id="probabilityDetails">
+                    <div class="analysis-placeholder">
+                        Ready to analyze probabilities
                     </div>
                 </div>
             </div>
 
-            <!-- Export Tab -->
-            <div class="tab-content" id="export-content" role="tabpanel" aria-labelledby="export-tab">
-                <div style="font-size: 11px; line-height: 1.5;">
-                    <p style="margin-bottom: 10px; color: var(--text-secondary);">
-                        <strong>Analysis Data Export</strong>
+            <!-- Token Sequence -->
+            <div class="tab-content" id="tokens-content" role="tabpanel">
+                <div class="token-inspector">
+                    <div class="token-sequence">
+                        <div class="token-stream" id="tokenStream" role="list"></div>
+                        <div class="sequence-legend">
+                            <span class="legend-item high">High uncertainty</span>
+                            <span class="legend-item medium">Medium uncertainty</span>
+                            <span class="legend-item low">Low uncertainty</span>
+                        </div>
+                    </div>
+                    <div class="token-details" id="alternativeTokens">
+                        <div class="details-placeholder">Click a token to inspect alternatives</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="tab-content" id="stats-content" role="tabpanel">
+                <div class="stats-container">
+                    <div class="stats-section">
+                        <h4>Statistical Summary</h4>
+                        <div id="statsResults">
+                            Generate tokens to see statistical analysis
+                        </div>
+                    </div>
+                    <div class="stats-section">
+                        <h4>Performance</h4>
+                        <div id="perfResults">
+                            <div class="perf-metric">
+                                <span>Generation Time</span>
+                                <span id="generationTime">-</span>
+                            </div>
+                            <div class="perf-metric">
+                                <span>Tokens/Second</span>
+                                <span id="tokensPerSecond">-</span>
+                            </div>
+                            <div class="perf-metric">
+                                <span>Processing Rate</span>
+                                <span id="processingRate">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export -->
+            <div class="tab-content" id="export-content" role="tabpanel">
+                <div class="export-section">
+                    <h4>Export Data</h4>
+                    <p class="export-description">
+                        Export analysis results with complete probability data, statistics, and reproducibility metadata.
                     </p>
-                    <p style="margin-bottom: 10px; font-size: 10px;">
-                        Exports include: token probabilities, entropy values, surprisal metrics, 
-                        alternative tokens, model parameters, performance data, and reproducibility metadata.
-                    </p>
-                    <button class="btn primary" id="exportJsonBtn">
-                        <span>📄</span>
-                        Export JSON (Complete Data)
-                    </button>
-                    <button class="btn" id="exportCsvBtn" style="margin-top: 6px;">
-                        <span>📊</span>
-                        Export CSV (Statistical Analysis)
-                    </button>
-                    <button class="btn" id="shareConfigBtn" style="margin-top: 6px;">
-                        <span>🔗</span>
-                        Share Configuration
-                    </button>
+                    <div class="export-actions">
+                        <button class="btn-primary" id="exportJsonBtn">
+                            Export JSON
+                        </button>
+                        <button class="btn-secondary" id="exportCsvBtn">
+                            Export CSV
+                        </button>
+                        <button class="btn-ghost" id="shareConfigBtn">
+                            Share Config
+                        </button>
+                    </div>
+                    <div class="export-status" id="lastExport">
+                        No exports yet
+                    </div>
                 </div>
             </div>
         </section>
 
         <!-- Status Bar -->
         <footer class="status-bar" role="contentinfo">
-            <div class="experiment-info">
-                <span>Session: <span id="experimentId">-</span></span>
-                <span>Tokens: <span id="totalTokens">0</span></span>
-                <span>Uncertainty: <span id="avgUncertainty">-</span></span>
-                <span>Model: <span id="currentModelName">None</span></span>
-                <span>Errors: <span id="errorCount">0</span></span>
+            <div class="session-info">
+                <span class="info-item">Session: <span id="experimentId">-</span></span>
+                <span class="info-item">Model: <span id="currentModelName">None</span></span>
+                <span class="info-item">Tokens: <span id="totalTokens">0</span></span>
             </div>
-            <div class="export-actions">
-                <span id="lastExport">No exports yet</span>
+            <div class="status-info">
+                <span id="lastExport">Ready</span>
             </div>
         </footer>
     </div>
@@ -339,12 +338,6 @@
                 this.errorCount++;
                 console.error(`[${category}] Application Error:`, message, details);
                 
-                // Update error counter in UI
-                const errorCountElement = document.getElementById('errorCount');
-                if (errorCountElement) {
-                    errorCountElement.textContent = this.errorCount;
-                }
-                
                 // Store error for reporting
                 const errorRecord = {
                     timestamp: new Date().toISOString(),
@@ -400,10 +393,6 @@
             static clearErrors() {
                 this.errorCount = 0;
                 this.errorHistory = [];
-                const errorCountElement = document.getElementById('errorCount');
-                if (errorCountElement) {
-                    errorCountElement.textContent = '0';
-                }
             }
         }
 
@@ -1281,7 +1270,7 @@
                 });
 
                 // Tab switching
-                document.querySelectorAll('.tab').forEach(tab => {
+                document.querySelectorAll('.nav-tab').forEach(tab => {
                     tab.addEventListener('click', () => {
                         this.switchTab(tab.dataset.tab);
                     });
@@ -1290,23 +1279,19 @@
                 // Slider updates with live feedback
                 const tempSlider = document.getElementById('tempSlider');
                 const tempValue = document.getElementById('tempValue');
-                const tempDisplay = document.getElementById('tempDisplay');
                 
                 tempSlider?.addEventListener('input', (e) => {
                     const value = parseFloat(e.target.value);
                     if (tempValue) tempValue.textContent = value;
-                    if (tempDisplay) tempDisplay.textContent = value;
                     InputValidator.clearValidationError('tempSlider');
                 });
 
                 const topKSlider = document.getElementById('topKSlider');
                 const topKValue = document.getElementById('topKValue');
-                const topKDisplay = document.getElementById('topKDisplay');
                 
                 topKSlider?.addEventListener('input', (e) => {
                     const value = parseInt(e.target.value);
                     if (topKValue) topKValue.textContent = value;
-                    if (topKDisplay) topKDisplay.textContent = value;
                     InputValidator.clearValidationError('topKSlider');
                 });
 
@@ -1870,8 +1855,6 @@
                     
                     // Update status bar
                     updateElement('totalTokens', this.tokenData.length);
-                    const avgUncertainty = this.calculateAverageUncertainty();
-                    updateElement('avgUncertainty', avgUncertainty);
                     
                 } catch (error) {
                     console.error('Error updating real-time analysis:', error);
@@ -1974,8 +1957,8 @@
                     
                     alternativeTokens.innerHTML = html;
                     
-                    // Switch to sequence tab
-                    this.switchTab('sequence');
+                    // Switch to tokens tab
+                    this.switchTab('tokens');
                 } catch (error) {
                     console.error('Error showing token details:', error);
                     this.logger.log(`Token details error: ${error.message}`, 'error');
@@ -2118,7 +2101,7 @@
 
             switchTab(tabName) {
                 // Update tab buttons with proper ARIA attributes
-                document.querySelectorAll('.tab').forEach(tab => {
+                document.querySelectorAll('.nav-tab').forEach(tab => {
                     const isActive = tab.dataset.tab === tabName;
                     tab.classList.toggle('active', isActive);
                     tab.setAttribute('aria-selected', isActive);
@@ -2282,10 +2265,8 @@
                         if (config.temperature) {
                             const tempSlider = document.getElementById('tempSlider');
                             const tempValue = document.getElementById('tempValue');
-                            const tempDisplay = document.getElementById('tempDisplay');
                             if (tempSlider) tempSlider.value = config.temperature;
                             if (tempValue) tempValue.textContent = config.temperature;
-                            if (tempDisplay) tempDisplay.textContent = config.temperature;
                         }
                         
                         if (config.maxTokens) {
@@ -2296,10 +2277,8 @@
                         if (config.topK) {
                             const topKSlider = document.getElementById('topKSlider');
                             const topKValue = document.getElementById('topKValue');
-                            const topKDisplay = document.getElementById('topKDisplay');
                             if (topKSlider) topKSlider.value = config.topK;
                             if (topKValue) topKValue.textContent = config.topK;
-                            if (topKDisplay) topKDisplay.textContent = config.topK;
                         }
                         
                         if (config.model) {
