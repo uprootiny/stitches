@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="description" content="Research-grade LLM analysis using real probability data">
-    <title>LLM Research Interface - Scientific</title>
+    <meta name="description" content="Robust LLM probability analysis with comprehensive error handling">
+    <title>LLM Probability Analyzer - Professional Interface</title>
     
     <style>
         :root {
@@ -94,7 +94,7 @@
             margin: 0;
         }
 
-        .research-badge {
+        .professional-badge {
             background: var(--text-accent);
             color: var(--bg-primary);
             padding: 4px 8px;
@@ -129,9 +129,51 @@
             background: var(--success);
         }
 
+        .status-indicator.error {
+            background: var(--error);
+            animation: blink 1s infinite;
+        }
+
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.4; }
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+
+        /* Error Alert */
+        .error-alert {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--error);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 6px;
+            z-index: 1001;
+            max-width: 400px;
+            font-size: 13px;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+
+        .error-alert.show {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .error-close {
+            float: right;
+            cursor: pointer;
+            font-weight: bold;
+            margin-left: 10px;
         }
 
         /* Controls Panel */
@@ -185,34 +227,11 @@
             letter-spacing: 0.5px;
         }
 
-        .help-icon {
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: var(--text-secondary);
-            color: var(--bg-primary);
+        .validation-error {
+            color: var(--error);
             font-size: 10px;
-            font-weight: bold;
-            text-align: center;
-            line-height: 14px;
-            cursor: help;
-            position: relative;
-        }
-
-        .help-icon:hover::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 120%;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 6px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            white-space: nowrap;
-            z-index: 1000;
-            pointer-events: none;
+            margin-top: 4px;
+            display: none;
         }
 
         .form-input {
@@ -231,6 +250,10 @@
             outline: none;
             border-color: var(--text-accent);
             box-shadow: 0 0 0 2px rgba(123, 179, 255, 0.2);
+        }
+
+        .form-input.error {
+            border-color: var(--error);
         }
 
         .form-textarea {
@@ -288,6 +311,7 @@
             align-items: center;
             gap: 6px;
             justify-content: center;
+            position: relative;
         }
 
         .btn:hover:not(:disabled) {
@@ -310,6 +334,17 @@
             background: var(--warning);
             color: var(--bg-primary);
             border-color: var(--warning);
+        }
+
+        /* Progress indicator */
+        .btn-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 2px;
+            background: var(--success);
+            transition: width 0.3s ease;
+            border-radius: 0 0 6px 6px;
         }
 
         /* Visualization Area */
@@ -344,21 +379,42 @@
             pointer-events: none;
         }
 
-        .viz-help {
+        .inference-log {
             position: absolute;
-            bottom: 12px;
-            left: 12px;
+            top: 12px;
             right: 12px;
-            text-align: center;
-            color: var(--text-secondary);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 6px;
+            padding: 8px 10px;
             font-size: 10px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            pointer-events: none;
+            font-family: var(--font-mono);
+            color: var(--text-secondary);
+            max-width: 250px;
+            max-height: 150px;
+            overflow-y: auto;
+            display: none;
         }
 
-        .visualization-area:hover .viz-help {
-            opacity: 1;
+        .inference-log.show {
+            display: block;
+        }
+
+        .log-entry {
+            margin-bottom: 2px;
+            opacity: 0.8;
+        }
+
+        .log-entry.error {
+            color: var(--error);
+        }
+
+        .log-entry.warning {
+            color: var(--warning);
+        }
+
+        .log-entry.success {
+            color: var(--success);
         }
 
         /* Results Panel */
@@ -504,31 +560,6 @@
             line-height: 1.4;
         }
 
-        .alternative-tokens {
-            margin-top: 8px;
-        }
-
-        .alternative-token {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 2px 4px;
-            margin-bottom: 2px;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 2px;
-            font-size: 10px;
-        }
-
-        .alternative-token-text {
-            font-family: var(--font-mono);
-            color: var(--text-primary);
-        }
-
-        .alternative-token-prob {
-            color: var(--text-accent);
-            font-weight: 600;
-        }
-
         /* Status Bar */
         .status-bar {
             grid-area: status;
@@ -552,11 +583,6 @@
             display: flex;
             align-items: center;
             gap: 4px;
-        }
-
-        .export-actions {
-            display: flex;
-            gap: 8px;
         }
 
         /* Loading Screen */
@@ -601,6 +627,22 @@
             font-size: 11px;
             text-align: center;
             max-width: 300px;
+        }
+
+        .loading-progress {
+            width: 200px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .loading-progress-bar {
+            height: 100%;
+            background: var(--text-accent);
+            width: 0%;
+            transition: width 0.3s ease;
         }
 
         /* Responsive Design */
@@ -660,11 +702,17 @@
 </head>
 <body>
     <div class="app-container">
+        <!-- Error Alert -->
+        <div class="error-alert" id="errorAlert">
+            <span class="error-close" onclick="this.parentElement.classList.remove('show')">&times;</span>
+            <div id="errorMessage"></div>
+        </div>
+
         <!-- Header -->
         <header class="header">
             <div class="app-title">
-                <h1>LLM Research Interface</h1>
-                <span class="research-badge">Scientific</span>
+                <h1>LLM Probability Analyzer</h1>
+                <span class="professional-badge">Professional</span>
             </div>
             <div class="model-status">
                 <span class="status-indicator" id="statusIndicator" aria-label="Model status"></span>
@@ -675,23 +723,19 @@
         <!-- Controls Panel -->
         <aside class="controls-panel">
             <div class="panel-header">
-                <h3>Experiment Configuration</h3>
+                <h3>Analysis Configuration</h3>
                 <p>Configure parameters for probability analysis</p>
             </div>
             <div class="panel-content">
                 <div class="form-group">
-                    <label class="form-label" for="modelSelect">
-                        Model Selection
-                        <span class="help-icon" data-tooltip="Choose the language model for analysis">?</span>
-                    </label>
+                    <label class="form-label" for="modelSelect">Model Selection</label>
                     <select class="form-input" id="modelSelect">
                         <option value="">Select a model...</option>
-                        <option value="TinyLlama-1.1B-Chat-v0.4-q4f16_1">TinyLlama (1.1B) - Fast inference</option>
-                        <option value="Phi-2-q4f16_1">Phi-2 (2.7B) - Microsoft Research</option>
-                        <option value="Llama-2-7b-chat-hf-q4f16_1">Llama-2-7B-Chat (7B) - Larger model</option>
                     </select>
+                    <div class="validation-error" id="modelError">Please select a valid model</div>
                     <button class="btn primary" id="loadModelBtn" style="margin-top: 8px;">
-                        Load Model
+                        <span>Load Model</span>
+                        <div class="btn-progress" id="loadProgress" style="width: 0%;"></div>
                     </button>
                     <button class="btn" id="refreshModelsBtn" style="margin-top: 4px; font-size: 10px;">
                         Refresh Available Models
@@ -699,56 +743,56 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="promptInput">
-                        Research Prompt
-                        <span class="help-icon" data-tooltip="Text for the model to continue. Affects probability distributions.">?</span>
-                    </label>
+                    <label class="form-label" for="promptInput">Analysis Prompt</label>
                     <textarea 
                         class="form-input form-textarea" 
                         id="promptInput" 
-                        placeholder="Enter research prompt...">The transformer architecture uses attention mechanisms to</textarea>
+                        placeholder="Enter text for probability analysis...">The transformer architecture uses attention mechanisms to</textarea>
+                    <div class="validation-error" id="promptError">Prompt cannot be empty</div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">
-                        Temperature
-                        <span class="help-icon" data-tooltip="Controls randomness: 0.1=focused, 2.0=creative. Affects probability distributions.">?</span>
-                    </label>
+                    <label class="form-label">Temperature (0.1 - 2.0)</label>
                     <div class="slider-group">
                         <input type="range" class="slider" id="tempSlider" 
                                min="0.1" max="2.0" step="0.1" value="1.0">
                         <span class="slider-value" id="tempValue">1.0</span>
                     </div>
+                    <div class="validation-error" id="tempError">Temperature must be between 0.1 and 2.0</div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">
-                        Max Tokens
-                        <span class="help-icon" data-tooltip="Number of tokens to generate for analysis">?</span>
-                    </label>
+                    <label class="form-label">Max Tokens (5 - 50)</label>
                     <input type="number" class="form-input" id="maxTokens" 
                            min="5" max="50" value="20">
+                    <div class="validation-error" id="tokensError">Max tokens must be between 5 and 50</div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">
-                        Top-K Alternatives
-                        <span class="help-icon" data-tooltip="Number of alternative tokens to analyze (affects entropy calculation)">?</span>
-                    </label>
+                    <label class="form-label">Top-K Alternatives (3 - 10)</label>
                     <div class="slider-group">
                         <input type="range" class="slider" id="topKSlider" 
-                               min="3" max="20" step="1" value="10">
-                        <span class="slider-value" id="topKValue">10</span>
+                               min="3" max="10" step="1" value="5">
+                        <span class="slider-value" id="topKValue">5</span>
                     </div>
+                    <div class="validation-error" id="topKError">Top-K must be between 3 and 10</div>
                 </div>
 
                 <div class="form-group">
                     <button class="btn primary" id="generateBtn" disabled style="width: 100%;">
-                        Generate & Analyze
+                        <span>Generate & Analyze</span>
+                        <div class="btn-progress" id="generateProgress" style="width: 0%;"></div>
                     </button>
                     <button class="btn warning" id="stopBtn" disabled style="width: 100%; margin-top: 6px;">
                         Stop Generation
                     </button>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">
+                        <input type="checkbox" id="debugMode" style="margin-right: 6px;">
+                        Show Inference Debug Log
+                    </label>
                 </div>
             </div>
         </aside>
@@ -761,8 +805,9 @@
                 <div>Tokens: <span id="tokenCount">0</span></div>
                 <div>Avg Entropy: <span id="avgEntropy">0.00</span></div>
             </div>
-            <div class="viz-help">
-                Visualization shows token probability distributions and uncertainty patterns
+            <div class="inference-log" id="inferenceLog">
+                <div style="font-weight: bold; margin-bottom: 4px;">Inference Debug Log</div>
+                <div id="logEntries"></div>
             </div>
         </main>
 
@@ -826,14 +871,14 @@
             <div class="tab-content" id="export-content">
                 <div style="font-size: 11px; line-height: 1.5;">
                     <p style="margin-bottom: 10px; color: var(--text-secondary);">
-                        <strong>Research Data Export</strong>
+                        <strong>Analysis Data Export</strong>
                     </p>
                     <p style="margin-bottom: 10px; font-size: 10px;">
                         Exports include: token probabilities, entropy values, surprisal metrics, 
                         alternative tokens, model parameters, and reproducibility metadata.
                     </p>
                     <button class="btn primary" id="exportJsonBtn" style="width: 100%; margin-bottom: 6px;">
-                        Export JSON (Research Data)
+                        Export JSON (Complete Data)
                     </button>
                     <button class="btn" id="exportCsvBtn" style="width: 100%;">
                         Export CSV (Statistical Analysis)
@@ -845,9 +890,10 @@
         <!-- Status Bar -->
         <footer class="status-bar">
             <div class="experiment-info">
-                <span>Experiment ID: <span id="experimentId">-</span></span>
+                <span>Session ID: <span id="experimentId">-</span></span>
                 <span>Tokens Generated: <span id="totalTokens">0</span></span>
                 <span>Avg Uncertainty: <span id="avgUncertainty">-</span></span>
+                <span>Model: <span id="currentModelName">None</span></span>
             </div>
             <div class="export-actions">
                 <span id="lastExport">No exports yet</span>
@@ -859,23 +905,203 @@
     <div class="loading-screen" id="loadingScreen">
         <div class="loading-spinner"></div>
         <div class="loading-text" id="loadingText">Initializing WebLLM...</div>
-        <div class="loading-details" id="loadingDetails">Setting up research environment</div>
+        <div class="loading-details" id="loadingDetails">Setting up analysis environment</div>
+        <div class="loading-progress">
+            <div class="loading-progress-bar" id="loadingProgressBar"></div>
+        </div>
     </div>
 
     <script type="module">
         import * as webllm from "https://esm.run/@mlc-ai/web-llm";
 
         /**
-         * Statistical analysis utilities for probability distributions
+         * Enhanced error handling and logging utilities
+         */
+        class ErrorHandler {
+            static showError(message, details = null) {
+                console.error('Application Error:', message, details);
+                
+                const alertEl = document.getElementById('errorAlert');
+                const messageEl = document.getElementById('errorMessage');
+                
+                messageEl.textContent = message;
+                if (details) {
+                    messageEl.innerHTML += `<br><small>Details: ${details}</small>`;
+                }
+                
+                alertEl.classList.add('show');
+                
+                // Auto-hide after 10 seconds
+                setTimeout(() => {
+                    alertEl.classList.remove('show');
+                }, 10000);
+            }
+
+            static logError(context, error) {
+                const timestamp = new Date().toISOString();
+                console.error(`[${timestamp}] ${context}:`, error);
+                return {
+                    timestamp,
+                    context,
+                    error: error.message || error.toString(),
+                    stack: error.stack
+                };
+            }
+        }
+
+        /**
+         * Comprehensive input validation
+         */
+        class InputValidator {
+            static validatePrompt(prompt) {
+                const trimmed = prompt.trim();
+                if (!trimmed) {
+                    throw new Error('Prompt cannot be empty');
+                }
+                if (trimmed.length > 1000) {
+                    throw new Error('Prompt too long (max 1000 characters)');
+                }
+                return trimmed;
+            }
+
+            static validateTemperature(temp) {
+                const value = parseFloat(temp);
+                if (isNaN(value) || value < 0.1 || value > 2.0) {
+                    throw new Error('Temperature must be between 0.1 and 2.0');
+                }
+                return value;
+            }
+
+            static validateMaxTokens(tokens) {
+                const value = parseInt(tokens);
+                if (isNaN(value) || value < 5 || value > 50) {
+                    throw new Error('Max tokens must be between 5 and 50');
+                }
+                return value;
+            }
+
+            static validateTopK(topK) {
+                const value = parseInt(topK);
+                if (isNaN(value) || value < 3 || value > 10) {
+                    throw new Error('Top-K must be between 3 and 10');
+                }
+                return value;
+            }
+
+            static showValidationError(fieldId, message) {
+                const field = document.getElementById(fieldId);
+                const errorEl = document.getElementById(fieldId.replace(/Input|Slider/, 'Error'));
+                
+                if (field && errorEl) {
+                    field.classList.add('error');
+                    errorEl.textContent = message;
+                    errorEl.style.display = 'block';
+                }
+            }
+
+            static clearValidationError(fieldId) {
+                const field = document.getElementById(fieldId);
+                const errorEl = document.getElementById(fieldId.replace(/Input|Slider/, 'Error'));
+                
+                if (field && errorEl) {
+                    field.classList.remove('error');
+                    errorEl.style.display = 'none';
+                }
+            }
+
+            static clearAllValidationErrors() {
+                const errorElements = document.querySelectorAll('.validation-error');
+                const fieldElements = document.querySelectorAll('.form-input');
+                
+                errorElements.forEach(el => el.style.display = 'none');
+                fieldElements.forEach(el => el.classList.remove('error'));
+            }
+        }
+
+        /**
+         * Enhanced inference logging and monitoring
+         */
+        class InferenceLogger {
+            constructor() {
+                this.logs = [];
+                this.maxLogs = 50;
+                this.enabled = false;
+            }
+
+            enable() {
+                this.enabled = true;
+                document.getElementById('inferenceLog').classList.add('show');
+            }
+
+            disable() {
+                this.enabled = false;
+                document.getElementById('inferenceLog').classList.remove('show');
+            }
+
+            log(message, type = 'info') {
+                if (!this.enabled) return;
+
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = {
+                    timestamp,
+                    message,
+                    type
+                };
+
+                this.logs.push(logEntry);
+                if (this.logs.length > this.maxLogs) {
+                    this.logs.shift();
+                }
+
+                this.updateUI();
+            }
+
+            updateUI() {
+                const container = document.getElementById('logEntries');
+                if (!container) return;
+
+                container.innerHTML = this.logs
+                    .slice(-20) // Show last 20 entries
+                    .map(log => `<div class="log-entry ${log.type}">[${log.timestamp}] ${log.message}</div>`)
+                    .join('');
+
+                // Auto-scroll to bottom
+                container.scrollTop = container.scrollHeight;
+            }
+
+            clear() {
+                this.logs = [];
+                this.updateUI();
+            }
+        }
+
+        /**
+         * Robust statistical analysis utilities
          */
         class StatisticalAnalysis {
             static calculateEntropy(probabilities) {
-                return -probabilities.reduce((sum, p) => {
-                    return p > 0 ? sum + p * Math.log2(p) : sum;
+                if (!Array.isArray(probabilities) || probabilities.length === 0) {
+                    return 0;
+                }
+
+                // Handle edge cases and invalid probabilities
+                const validProbs = probabilities.filter(p => 
+                    typeof p === 'number' && !isNaN(p) && p > 0 && p <= 1
+                );
+
+                if (validProbs.length === 0) {
+                    return 0;
+                }
+
+                return -validProbs.reduce((sum, p) => {
+                    return sum + p * Math.log2(p);
                 }, 0);
             }
 
             static calculateSurprisal(probability) {
+                if (typeof probability !== 'number' || isNaN(probability) || probability <= 0) {
+                    return 0;
+                }
                 return -Math.log2(Math.max(probability, 1e-10));
             }
 
@@ -885,17 +1111,31 @@
             }
 
             static classifyUncertainty(entropy) {
+                if (typeof entropy !== 'number' || isNaN(entropy)) {
+                    return 'low';
+                }
+                
                 if (entropy > 3.0) return 'high';
                 if (entropy > 1.5) return 'medium';
                 return 'low';
             }
 
-            static calculateStatistics(entropies) {
-                if (entropies.length === 0) return null;
+            static calculateStatistics(values) {
+                if (!Array.isArray(values) || values.length === 0) {
+                    return null;
+                }
+
+                const validValues = values.filter(v => 
+                    typeof v === 'number' && !isNaN(v) && isFinite(v)
+                );
+
+                if (validValues.length === 0) {
+                    return null;
+                }
                 
-                const sorted = [...entropies].sort((a, b) => a - b);
-                const mean = entropies.reduce((a, b) => a + b) / entropies.length;
-                const variance = entropies.reduce((sum, x) => sum + Math.pow(x - mean, 2), 0) / entropies.length;
+                const sorted = [...validValues].sort((a, b) => a - b);
+                const mean = validValues.reduce((a, b) => a + b) / validValues.length;
+                const variance = validValues.reduce((sum, x) => sum + Math.pow(x - mean, 2), 0) / validValues.length;
                 
                 return {
                     mean: mean,
@@ -904,13 +1144,14 @@
                     min: sorted[0],
                     max: sorted[sorted.length - 1],
                     q25: sorted[Math.floor(sorted.length * 0.25)],
-                    q75: sorted[Math.floor(sorted.length * 0.75)]
+                    q75: sorted[Math.floor(sorted.length * 0.75)],
+                    count: validValues.length
                 };
             }
         }
 
         /**
-         * Probability visualization using Canvas
+         * Enhanced probability visualization
          */
         class ProbabilityVisualizer {
             constructor(canvasId) {
@@ -918,30 +1159,50 @@
                 this.ctx = this.canvas.getContext('2d');
                 this.tokens = [];
                 this.maxTokens = 50;
+                this.animationFrame = null;
                 
                 this.resizeCanvas();
                 window.addEventListener('resize', () => this.resizeCanvas());
             }
 
             resizeCanvas() {
+                if (!this.canvas) return;
+                
                 const rect = this.canvas.getBoundingClientRect();
-                this.canvas.width = rect.width * window.devicePixelRatio;
-                this.canvas.height = rect.height * window.devicePixelRatio;
-                this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                const dpr = window.devicePixelRatio || 1;
+                
+                this.canvas.width = rect.width * dpr;
+                this.canvas.height = rect.height * dpr;
+                this.ctx.scale(dpr, dpr);
                 this.canvas.style.width = rect.width + 'px';
                 this.canvas.style.height = rect.height + 'px';
+                
                 this.redraw();
             }
 
             addToken(tokenData) {
+                if (!tokenData || typeof tokenData !== 'object') {
+                    console.warn('Invalid token data provided to visualizer');
+                    return;
+                }
+
                 this.tokens.push(tokenData);
                 if (this.tokens.length > this.maxTokens) {
                     this.tokens.shift();
                 }
-                this.redraw();
+                
+                // Throttle redraws for performance
+                if (!this.animationFrame) {
+                    this.animationFrame = requestAnimationFrame(() => {
+                        this.redraw();
+                        this.animationFrame = null;
+                    });
+                }
             }
 
             redraw() {
+                if (!this.ctx) return;
+                
                 const rect = this.canvas.getBoundingClientRect();
                 this.ctx.clearRect(0, 0, rect.width, rect.height);
                 
@@ -950,11 +1211,13 @@
                     return;
                 }
 
-                // Draw entropy over time
-                this.drawEntropyGraph();
-                
-                // Draw current probability distribution
-                this.drawProbabilityDistribution();
+                try {
+                    this.drawEntropyGraph();
+                    this.drawProbabilityDistribution();
+                } catch (error) {
+                    console.error('Visualization error:', error);
+                    this.drawErrorMessage();
+                }
             }
 
             drawPlaceholder() {
@@ -965,6 +1228,14 @@
                 this.ctx.fillText('Generate tokens to see probability analysis', rect.width / 2, rect.height / 2);
             }
 
+            drawErrorMessage() {
+                const rect = this.canvas.getBoundingClientRect();
+                this.ctx.fillStyle = 'rgba(229, 85, 85, 0.7)';
+                this.ctx.font = '12px var(--font-primary)';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('Visualization error - check console', rect.width / 2, rect.height / 2);
+            }
+
             drawEntropyGraph() {
                 const rect = this.canvas.getBoundingClientRect();
                 const margin = 40;
@@ -972,6 +1243,16 @@
                 const graphHeight = (rect.height / 2) - margin;
                 
                 if (this.tokens.length < 2) return;
+
+                // Validate entropy values
+                const validTokens = this.tokens.filter(t => 
+                    t.entropy !== undefined && 
+                    typeof t.entropy === 'number' && 
+                    !isNaN(t.entropy) && 
+                    isFinite(t.entropy)
+                );
+
+                if (validTokens.length < 2) return;
 
                 // Draw axes
                 this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
@@ -987,12 +1268,13 @@
                 this.ctx.lineWidth = 2;
                 this.ctx.beginPath();
                 
-                const maxEntropy = Math.max(...this.tokens.map(t => t.entropy));
-                const minEntropy = Math.min(...this.tokens.map(t => t.entropy));
+                const entropies = validTokens.map(t => t.entropy);
+                const maxEntropy = Math.max(...entropies);
+                const minEntropy = Math.min(...entropies);
                 const entropyRange = maxEntropy - minEntropy || 1;
 
-                this.tokens.forEach((token, index) => {
-                    const x = margin + (index / (this.tokens.length - 1)) * graphWidth;
+                validTokens.forEach((token, index) => {
+                    const x = margin + (index / (validTokens.length - 1)) * graphWidth;
                     const y = margin + graphHeight - ((token.entropy - minEntropy) / entropyRange) * graphHeight;
                     
                     if (index === 0) {
@@ -1021,19 +1303,29 @@
                 if (this.tokens.length === 0) return;
 
                 const currentToken = this.tokens[this.tokens.length - 1];
-                if (!currentToken.alternatives || currentToken.alternatives.length === 0) return;
+                if (!currentToken.alternatives || !Array.isArray(currentToken.alternatives) || currentToken.alternatives.length === 0) {
+                    return;
+                }
 
                 // Draw bars for top alternatives
-                const barWidth = graphWidth / currentToken.alternatives.length;
+                const validAlternatives = currentToken.alternatives.filter(alt => 
+                    alt && typeof alt === 'object' && typeof alt.logprob === 'number' && !isNaN(alt.logprob)
+                );
+
+                if (validAlternatives.length === 0) return;
+
+                const barWidth = graphWidth / validAlternatives.length;
                 
-                currentToken.alternatives.forEach((alt, index) => {
+                validAlternatives.forEach((alt, index) => {
                     const prob = Math.exp(alt.logprob);
+                    if (isNaN(prob) || !isFinite(prob)) return;
+                    
                     const barHeight = prob * graphHeight;
                     const x = margin + index * barWidth;
                     const y = startY + graphHeight - barHeight;
                     
                     // Color based on probability
-                    const alpha = 0.3 + prob * 0.7;
+                    const alpha = Math.max(0.3, Math.min(1.0, 0.3 + prob * 0.7));
                     this.ctx.fillStyle = `rgba(123, 179, 255, ${alpha})`;
                     this.ctx.fillRect(x + 2, y, barWidth - 4, barHeight);
                     
@@ -1041,11 +1333,9 @@
                     this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
                     this.ctx.font = '9px var(--font-mono)';
                     this.ctx.textAlign = 'center';
-                    this.ctx.fillText(
-                        alt.token.substring(0, 8), 
-                        x + barWidth / 2, 
-                        startY + graphHeight + 15
-                    );
+                    
+                    const tokenText = (alt.token || '').toString().substring(0, 8);
+                    this.ctx.fillText(tokenText, x + barWidth / 2, startY + graphHeight + 15);
                 });
 
                 // Label
@@ -1059,51 +1349,77 @@
                 this.tokens = [];
                 this.redraw();
             }
+
+            destroy() {
+                if (this.animationFrame) {
+                    cancelAnimationFrame(this.animationFrame);
+                }
+                window.removeEventListener('resize', this.resizeCanvas);
+            }
         }
 
         /**
-         * Main research interface application
+         * Enhanced main application with comprehensive error handling
          */
-        class LLMResearchInterface {
+        class RobustLLMAnalyzer {
             constructor() {
                 this.engine = null;
                 this.currentModel = null;
                 this.isGenerating = false;
+                this.isLoading = false;
                 this.tokenData = [];
                 this.experimentId = this.generateExperimentId();
-                this.visualizer = new ProbabilityVisualizer('probabilityCanvas');
+                this.visualizer = null;
+                this.logger = new InferenceLogger();
+                this.abortController = null;
+                this.generationErrors = [];
                 
                 this.init();
             }
 
             generateExperimentId() {
-                return 'exp_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 5);
+                return 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 5);
             }
 
             async init() {
                 try {
                     this.updateLoadingText('Initializing WebLLM engine...', 'This may take a moment');
+                    this.updateLoadingProgress(10);
                     
+                    // Initialize visualizer first
+                    this.visualizer = new ProbabilityVisualizer('probabilityCanvas');
+                    this.updateLoadingProgress(20);
+                    
+                    // Initialize WebLLM engine with error handling
                     this.engine = new webllm.MLCEngine();
-                    this.setupEventListeners();
-                    this.updateUI();
+                    this.updateLoadingProgress(40);
                     
-                    // Automatically refresh available models
+                    this.setupEventListeners();
+                    this.updateLoadingProgress(60);
+                    
+                    this.updateUI();
+                    document.getElementById('experimentId').textContent = this.experimentId;
+                    this.updateLoadingProgress(80);
+                    
+                    // Load available models
                     this.updateLoadingText('Loading available models...', 'Checking model catalog');
                     await this.refreshAvailableModels();
+                    this.updateLoadingProgress(100);
                     
                     this.hideLoadingScreen();
                     this.updateModelStatus('WebLLM ready - select a model to begin');
-                    document.getElementById('experimentId').textContent = this.experimentId;
+                    this.logger.log('Application initialized successfully', 'success');
                     
                 } catch (error) {
-                    console.error('Initialization failed:', error);
+                    const errorInfo = ErrorHandler.logError('Initialization', error);
                     this.updateLoadingText('Initialization failed', error.message);
+                    ErrorHandler.showError('Failed to initialize application', error.message);
+                    this.updateModelStatus('Initialization failed', 'error');
                 }
             }
 
             setupEventListeners() {
-                // Model loading
+                // Model management
                 document.getElementById('loadModelBtn').addEventListener('click', () => {
                     this.loadModel();
                 });
@@ -1112,7 +1428,7 @@
                     this.refreshAvailableModels();
                 });
 
-                // Generation
+                // Generation controls
                 document.getElementById('generateBtn').addEventListener('click', () => {
                     this.generateAndAnalyze();
                 });
@@ -1128,16 +1444,37 @@
                     });
                 });
 
-                // Slider updates
+                // Input validation and updates
                 document.getElementById('tempSlider').addEventListener('input', (e) => {
                     document.getElementById('tempValue').textContent = e.target.value;
+                    InputValidator.clearValidationError('tempSlider');
                 });
 
                 document.getElementById('topKSlider').addEventListener('input', (e) => {
                     document.getElementById('topKValue').textContent = e.target.value;
+                    InputValidator.clearValidationError('topKSlider');
                 });
 
-                // Export buttons
+                // Clear validation errors on input
+                document.getElementById('promptInput').addEventListener('input', () => {
+                    InputValidator.clearValidationError('promptInput');
+                });
+
+                document.getElementById('maxTokens').addEventListener('input', () => {
+                    InputValidator.clearValidationError('maxTokens');
+                });
+
+                // Debug mode toggle
+                document.getElementById('debugMode').addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        this.logger.enable();
+                        this.logger.log('Debug mode enabled', 'info');
+                    } else {
+                        this.logger.disable();
+                    }
+                });
+
+                // Export functionality
                 document.getElementById('exportJsonBtn').addEventListener('click', () => {
                     this.exportData('json');
                 });
@@ -1145,308 +1482,588 @@
                 document.getElementById('exportCsvBtn').addEventListener('click', () => {
                     this.exportData('csv');
                 });
+
+                // Cleanup on page unload
+                window.addEventListener('beforeunload', () => {
+                    this.cleanup();
+                });
             }
 
             async refreshAvailableModels() {
                 try {
                     this.updateModelStatus('Checking available models...');
+                    this.logger.log('Refreshing model catalog', 'info');
                     
-                    // Import webllm to get the prebuilt models list
+                    // Get available models with error handling
                     const webllm = await import("https://esm.run/@mlc-ai/web-llm");
                     
-                    // Get available models from prebuilt config
-                    const availableModels = webllm.prebuiltAppConfig.model_list;
+                    if (!webllm.prebuiltAppConfig || !webllm.prebuiltAppConfig.model_list) {
+                        throw new Error('Unable to access model catalog');
+                    }
                     
-                    // Update dropdown with available models
+                    const availableModels = webllm.prebuiltAppConfig.model_list;
+                    this.logger.log(`Found ${availableModels.length} total models`, 'info');
+                    
+                    // Filter for suitable models with better criteria
+                    const suitableModels = availableModels.filter(model => {
+                        const modelId = model.model_id || model.model || '';
+                        const lowerModelId = modelId.toLowerCase();
+                        
+                        // Include smaller, analysis-friendly models
+                        return lowerModelId.includes('tinyllama') || 
+                               lowerModelId.includes('phi') || 
+                               lowerModelId.includes('gemma') ||
+                               (lowerModelId.includes('llama') && lowerModelId.includes('7b')) ||
+                               lowerModelId.includes('mistral');
+                    }).slice(0, 15); // Limit for UI performance
+                    
                     const select = document.getElementById('modelSelect');
                     select.innerHTML = '<option value="">Select a model...</option>';
-                    
-                    // Filter for smaller models suitable for research
-                    const suitableModels = availableModels.filter(model => {
-                        const modelId = model.model_id || model.model;
-                        return modelId.includes('TinyLlama') || 
-                               modelId.includes('Phi') || 
-                               modelId.includes('Llama-2-7b') ||
-                               modelId.includes('gemma');
-                    }).slice(0, 10); // Limit to first 10 suitable models
                     
                     suitableModels.forEach(model => {
                         const modelId = model.model_id || model.model;
                         const option = document.createElement('option');
                         option.value = modelId;
-                        option.textContent = `${modelId} (${model.model_lib || 'Unknown size'})`;
+                        
+                        // Create more informative labels
+                        let label = modelId;
+                        if (model.model_lib) {
+                            label += ` (${model.model_lib})`;
+                        }
+                        if (modelId.includes('1.1B') || modelId.includes('TinyLlama')) {
+                            label += ' - Fast';
+                        } else if (modelId.includes('7B')) {
+                            label += ' - Larger';
+                        }
+                        
+                        option.textContent = label;
                         select.appendChild(option);
                     });
                     
-                    this.updateModelStatus(`Found ${suitableModels.length} available models`);
+                    this.updateModelStatus(`Found ${suitableModels.length} compatible models`);
+                    this.logger.log(`Loaded ${suitableModels.length} compatible models`, 'success');
                     
                 } catch (error) {
-                    console.error('Failed to refresh models:', error);
+                    const errorInfo = ErrorHandler.logError('Model refresh', error);
                     this.updateModelStatus('Failed to refresh models');
+                    this.logger.log(`Model refresh failed: ${error.message}`, 'error');
+                    ErrorHandler.showError('Could not load model catalog', error.message);
                 }
             }
 
             async loadModel() {
+                if (this.isLoading) {
+                    this.logger.log('Model loading already in progress', 'warning');
+                    return;
+                }
+
                 try {
                     const modelId = document.getElementById('modelSelect').value;
                     if (!modelId) {
-                        alert('Please select a model');
+                        InputValidator.showValidationError('modelSelect', 'Please select a model');
                         return;
                     }
 
+                    InputValidator.clearValidationError('modelSelect');
+                    this.isLoading = true;
                     this.updateModelStatus('Loading model...');
                     this.showLoadingScreen();
+                    this.logger.log(`Starting to load model: ${modelId}`, 'info');
+                    
                     this.updateLoadingText(`Loading ${modelId}...`, 'This may take several minutes on first load');
+                    this.updateLoadingProgress(0);
+
+                    // Create abort controller for model loading
+                    this.abortController = new AbortController();
                     
                     try {
-                        // Try loading with progress callback (newer WebLLM versions)
+                        // Attempt loading with progress callback
                         await this.engine.reload(modelId, undefined, (progress) => {
-                            if (progress && progress.progress !== undefined) {
+                            if (this.abortController.signal.aborted) {
+                                throw new Error('Model loading was cancelled');
+                            }
+                            
+                            if (progress && typeof progress.progress === 'number') {
+                                const percent = Math.floor(progress.progress * 100);
+                                this.updateLoadingProgress(percent);
                                 this.updateLoadingText(
                                     `Loading ${modelId}...`, 
-                                    `Progress: ${(progress.progress * 100).toFixed(1)}%`
+                                    `Progress: ${percent}% ${progress.text || ''}`
                                 );
+                                this.logger.log(`Loading progress: ${percent}%`, 'info');
                             }
                         });
                     } catch (progressError) {
-                        // Fallback to simple reload (older WebLLM versions)
-                        console.log('Progress callback not supported, using simple reload');
+                        // Fallback to simple reload
+                        this.logger.log('Progress callback not supported, using simple reload', 'warning');
                         await this.engine.reload(modelId);
                     }
                     
                     this.currentModel = modelId;
+                    document.getElementById('currentModelName').textContent = modelId;
                     
                     this.hideLoadingScreen();
                     this.updateModelStatus(`${modelId} loaded and ready`);
                     document.getElementById('generateBtn').disabled = false;
                     
+                    this.logger.log(`Model loaded successfully: ${modelId}`, 'success');
+                    
                 } catch (error) {
-                    console.error('Model loading failed:', error);
+                    const errorInfo = ErrorHandler.logError('Model loading', error);
                     this.updateModelStatus('Model loading failed');
                     this.hideLoadingScreen();
                     
-                    // Provide more helpful error message
                     let errorMessage = `Failed to load model: ${error.message}`;
                     if (error.message.includes('Cannot find model record')) {
-                        errorMessage += '\n\nTry clicking "Refresh Available Models" to see current options.';
+                        errorMessage += '\n\nTry refreshing available models or selecting a different model.';
+                    } else if (error.message.includes('cancelled')) {
+                        errorMessage = 'Model loading was cancelled';
                     }
-                    alert(errorMessage);
+                    
+                    ErrorHandler.showError(errorMessage);
+                    this.logger.log(`Model loading failed: ${error.message}`, 'error');
+                    
+                } finally {
+                    this.isLoading = false;
+                    this.abortController = null;
+                }
+            }
+
+            validateInputs() {
+                InputValidator.clearAllValidationErrors();
+                const errors = [];
+
+                try {
+                    const prompt = InputValidator.validatePrompt(document.getElementById('promptInput').value);
+                    const temperature = InputValidator.validateTemperature(document.getElementById('tempSlider').value);
+                    const maxTokens = InputValidator.validateMaxTokens(document.getElementById('maxTokens').value);
+                    const topK = InputValidator.validateTopK(document.getElementById('topKValue').textContent);
+
+                    return { prompt, temperature, maxTokens, topK };
+                    
+                } catch (error) {
+                    if (error.message.includes('Prompt')) {
+                        InputValidator.showValidationError('promptInput', error.message);
+                    } else if (error.message.includes('Temperature')) {
+                        InputValidator.showValidationError('tempSlider', error.message);
+                    } else if (error.message.includes('tokens')) {
+                        InputValidator.showValidationError('maxTokens', error.message);
+                    } else if (error.message.includes('Top-K')) {
+                        InputValidator.showValidationError('topKSlider', error.message);
+                    }
+                    
+                    throw error;
                 }
             }
 
             async generateAndAnalyze() {
-                if (!this.currentModel || this.isGenerating) return;
-                
-                const prompt = document.getElementById('promptInput').value.trim();
-                if (!prompt) {
-                    alert('Please enter a prompt');
+                if (!this.currentModel || this.isGenerating) {
+                    this.logger.log('Cannot start generation - model not ready or already generating', 'warning');
                     return;
                 }
-
-                this.isGenerating = true;
-                this.tokenData = [];
-                this.visualizer.clear();
-                this.updateGenerationUI();
                 
                 try {
-                    const temperature = parseFloat(document.getElementById('tempSlider').value);
-                    const maxTokens = parseInt(document.getElementById('maxTokens').value);
-                    const topK = parseInt(document.getElementById('topKValue').textContent);
+                    // Validate all inputs
+                    const { prompt, temperature, maxTokens, topK } = this.validateInputs();
+                    
+                    this.isGenerating = true;
+                    this.tokenData = [];
+                    this.generationErrors = [];
+                    this.visualizer.clear();
+                    this.logger.clear();
+                    this.updateGenerationUI();
+                    
+                    this.logger.log('Starting token generation and analysis', 'info');
+                    this.logger.log(`Parameters: temp=${temperature}, maxTokens=${maxTokens}, topK=${topK}`, 'info');
+                    
+                    // Create abort controller for generation
+                    this.abortController = new AbortController();
                     
                     const messages = [{ role: "user", content: prompt }];
-                    const stream = await this.engine.chat.completions.create({
+                    
+                    // Prepare generation config with defensive parameters
+                    const generationConfig = {
                         messages,
                         temperature,
                         max_tokens: maxTokens,
                         stream: true,
                         logprobs: true,
-                        top_logprobs: topK
-                    });
-
+                        top_logprobs: Math.min(topK, 5) // Clamp to safe range
+                    };
+                    
+                    this.logger.log('Creating chat completion stream', 'info');
+                    
+                    const stream = await this.engine.chat.completions.create(generationConfig);
+                    
                     let tokenPosition = 0;
+                    let successfulTokens = 0;
+                    
+                    this.logger.log('Processing token stream', 'info');
+                    
                     for await (const chunk of stream) {
-                        if (!this.isGenerating) break;
-                        
-                        const choice = chunk.choices[0];
-                        if (choice?.delta?.content && choice?.logprobs) {
-                            tokenPosition++;
-                            const tokenInfo = this.processTokenData(choice, tokenPosition);
-                            this.tokenData.push(tokenInfo);
-                            
-                            this.updateRealTimeAnalysis(tokenInfo);
-                            this.visualizer.addToken(tokenInfo);
-                            
-                            // Throttle updates for performance
-                            await new Promise(resolve => setTimeout(resolve, 200));
+                        if (!this.isGenerating || this.abortController.signal.aborted) {
+                            this.logger.log('Generation stopped by user', 'warning');
+                            break;
                         }
+                        
+                        try {
+                            tokenPosition++;
+                            const tokenInfo = this.processTokenChunk(chunk, tokenPosition);
+                            
+                            if (tokenInfo) {
+                                this.tokenData.push(tokenInfo);
+                                successfulTokens++;
+                                
+                                this.updateRealTimeAnalysis(tokenInfo);
+                                this.visualizer.addToken(tokenInfo);
+                                this.updateGenerationProgress(tokenPosition, maxTokens);
+                                
+                                this.logger.log(`Processed token ${tokenPosition}: "${tokenInfo.token}"`, 'success');
+                                
+                                // Throttle updates for performance
+                                await new Promise(resolve => setTimeout(resolve, 100));
+                            }
+                            
+                        } catch (tokenError) {
+                            this.generationErrors.push(ErrorHandler.logError(`Token ${tokenPosition}`, tokenError));
+                            this.logger.log(`Token processing error: ${tokenError.message}`, 'error');
+                            
+                            // Continue processing other tokens
+                            continue;
+                        }
+                    }
+                    
+                    this.logger.log(`Generation completed: ${successfulTokens}/${tokenPosition} tokens processed successfully`, 'success');
+                    
+                    if (this.generationErrors.length > 0) {
+                        this.logger.log(`${this.generationErrors.length} errors occurred during generation`, 'warning');
                     }
                     
                     this.finalizeAnalysis();
                     
                 } catch (error) {
-                    console.error('Generation failed:', error);
-                    alert(`Generation failed: ${error.message}`);
+                    const errorInfo = ErrorHandler.logError('Generation', error);
+                    this.logger.log(`Generation failed: ${error.message}`, 'error');
+                    ErrorHandler.showError(`Generation failed: ${error.message}`);
+                    
                 } finally {
                     this.isGenerating = false;
+                    this.abortController = null;
                     this.updateGenerationUI();
                 }
             }
 
-            processTokenData(choice, position) {
-                const logprobs = choice.logprobs.content[0];
-                const token = choice.delta.content;
-                const tokenLogprob = logprobs.logprob;
-                const tokenProbability = Math.exp(tokenLogprob);
-                
-                // Get alternatives
-                const alternatives = logprobs.top_logprobs || [];
-                const allProbs = alternatives.map(alt => Math.exp(alt.logprob));
-                
-                // Calculate metrics
-                const entropy = StatisticalAnalysis.calculateEntropy(allProbs);
-                const surprisal = StatisticalAnalysis.calculateSurprisal(tokenProbability);
-                const perplexity = StatisticalAnalysis.calculatePerplexity(allProbs);
-                const uncertainty = StatisticalAnalysis.classifyUncertainty(entropy);
-                
-                return {
-                    token,
-                    position,
-                    logprob: tokenLogprob,
-                    probability: tokenProbability,
-                    alternatives,
-                    entropy,
-                    surprisal,
-                    perplexity,
-                    uncertainty,
-                    timestamp: Date.now()
-                };
+            processTokenChunk(chunk, position) {
+                try {
+                    // Defensive extraction of token data
+                    const choice = chunk?.choices?.[0];
+                    if (!choice) {
+                        throw new Error('No choice data in chunk');
+                    }
+
+                    const content = choice?.delta?.content;
+                    const logprobs = choice?.logprobs;
+                    
+                    if (!content || !logprobs) {
+                        // Skip chunks without content or logprobs (common at start/end)
+                        return null;
+                    }
+
+                    const contentLogprobs = logprobs?.content?.[0];
+                    if (!contentLogprobs) {
+                        throw new Error('No content logprobs available');
+                    }
+
+                    const token = content;
+                    const tokenLogprob = contentLogprobs.logprob;
+                    
+                    if (typeof tokenLogprob !== 'number' || isNaN(tokenLogprob)) {
+                        throw new Error('Invalid token logprob');
+                    }
+
+                    const tokenProbability = Math.exp(tokenLogprob);
+                    
+                    // Extract alternatives with validation
+                    const alternatives = (contentLogprobs.top_logprobs || [])
+                        .filter(alt => alt && typeof alt.logprob === 'number' && !isNaN(alt.logprob))
+                        .map(alt => ({
+                            token: alt.token || '',
+                            logprob: alt.logprob
+                        }));
+                    
+                    // Calculate metrics with error handling
+                    const allProbs = alternatives.map(alt => {
+                        const prob = Math.exp(alt.logprob);
+                        return isFinite(prob) ? prob : 0;
+                    }).filter(p => p > 0);
+                    
+                    const entropy = StatisticalAnalysis.calculateEntropy(allProbs);
+                    const surprisal = StatisticalAnalysis.calculateSurprisal(tokenProbability);
+                    const perplexity = StatisticalAnalysis.calculatePerplexity(allProbs);
+                    const uncertainty = StatisticalAnalysis.classifyUncertainty(entropy);
+                    
+                    return {
+                        token,
+                        position,
+                        logprob: tokenLogprob,
+                        probability: tokenProbability,
+                        alternatives,
+                        entropy,
+                        surprisal,
+                        perplexity,
+                        uncertainty,
+                        timestamp: Date.now()
+                    };
+                    
+                } catch (error) {
+                    throw new Error(`Token processing failed: ${error.message}`);
+                }
             }
 
             updateRealTimeAnalysis(tokenInfo) {
-                // Update current metrics
-                document.getElementById('currentEntropy').textContent = tokenInfo.entropy.toFixed(2);
-                document.getElementById('currentConfidence').textContent = `${(tokenInfo.probability * 100).toFixed(1)}%`;
-                document.getElementById('currentSurprisal').textContent = tokenInfo.surprisal.toFixed(1);
-                document.getElementById('currentPerplexity').textContent = tokenInfo.perplexity.toFixed(1);
-                
-                // Update metric card styles based on uncertainty
-                const cards = ['entropyCard', 'confidenceCard', 'surprisalCard', 'perplexityCard'];
-                cards.forEach(cardId => {
-                    const card = document.getElementById(cardId);
-                    card.className = `metric-card uncertainty-${tokenInfo.uncertainty}`;
-                });
-                
-                // Update overlay
-                document.getElementById('tokenCount').textContent = tokenInfo.position;
-                const avgEntropy = this.tokenData.reduce((sum, t) => sum + t.entropy, 0) / this.tokenData.length;
-                document.getElementById('avgEntropy').textContent = avgEntropy.toFixed(2);
-                
-                // Update probability details
-                const details = this.formatProbabilityDetails(tokenInfo);
-                document.getElementById('probabilityDetails').innerHTML = details;
-                
-                // Update token sequence
-                this.updateTokenSequence();
-                
-                // Update status bar
-                document.getElementById('totalTokens').textContent = this.tokenData.length;
-                const avgUncertainty = this.calculateAverageUncertainty();
-                document.getElementById('avgUncertainty').textContent = avgUncertainty;
+                try {
+                    // Update current metrics with safety checks
+                    const setMetricValue = (id, value, formatter = (v) => v) => {
+                        const element = document.getElementById(id);
+                        if (element && typeof value === 'number' && isFinite(value)) {
+                            element.textContent = formatter(value);
+                        }
+                    };
+
+                    setMetricValue('currentEntropy', tokenInfo.entropy, v => v.toFixed(2));
+                    setMetricValue('currentConfidence', tokenInfo.probability * 100, v => `${v.toFixed(1)}%`);
+                    setMetricValue('currentSurprisal', tokenInfo.surprisal, v => v.toFixed(1));
+                    setMetricValue('currentPerplexity', tokenInfo.perplexity, v => v.toFixed(1));
+                    
+                    // Update metric card styles
+                    const cards = ['entropyCard', 'confidenceCard', 'surprisalCard', 'perplexityCard'];
+                    cards.forEach(cardId => {
+                        const card = document.getElementById(cardId);
+                        if (card) {
+                            card.className = `metric-card uncertainty-${tokenInfo.uncertainty}`;
+                        }
+                    });
+                    
+                    // Update overlay information
+                    const setOverlayValue = (id, value) => {
+                        const element = document.getElementById(id);
+                        if (element) {
+                            element.textContent = value;
+                        }
+                    };
+
+                    setOverlayValue('tokenCount', tokenInfo.position);
+                    
+                    if (this.tokenData.length > 0) {
+                        const avgEntropy = this.tokenData.reduce((sum, t) => sum + (t.entropy || 0), 0) / this.tokenData.length;
+                        setOverlayValue('avgEntropy', avgEntropy.toFixed(2));
+                    }
+                    
+                    // Update probability details
+                    const details = this.formatProbabilityDetails(tokenInfo);
+                    const detailsElement = document.getElementById('probabilityDetails');
+                    if (detailsElement) {
+                        detailsElement.innerHTML = details;
+                    }
+                    
+                    // Update token sequence
+                    this.updateTokenSequence();
+                    
+                    // Update status bar
+                    setOverlayValue('totalTokens', this.tokenData.length);
+                    const avgUncertainty = this.calculateAverageUncertainty();
+                    setOverlayValue('avgUncertainty', avgUncertainty);
+                    
+                } catch (error) {
+                    console.error('Error updating real-time analysis:', error);
+                    this.logger.log(`UI update error: ${error.message}`, 'error');
+                }
             }
 
             formatProbabilityDetails(tokenInfo) {
-                let html = `<strong>Token:</strong> "${tokenInfo.token}"<br>`;
-                html += `<strong>Probability:</strong> ${(tokenInfo.probability * 100).toFixed(2)}% (log: ${tokenInfo.logprob.toFixed(3)})<br>`;
-                html += `<strong>Entropy:</strong> ${tokenInfo.entropy.toFixed(2)} bits<br>`;
-                html += `<strong>Surprisal:</strong> ${tokenInfo.surprisal.toFixed(2)} bits<br>`;
-                html += `<strong>Uncertainty:</strong> ${tokenInfo.uncertainty}<br><br>`;
-                
-                if (tokenInfo.alternatives.length > 1) {
-                    html += `<strong>Top ${tokenInfo.alternatives.length} alternatives:</strong><br>`;
-                    tokenInfo.alternatives.slice(0, 5).forEach((alt, index) => {
-                        const prob = Math.exp(alt.logprob);
-                        const isSelected = alt.token === tokenInfo.token;
-                        html += `${index + 1}. "${alt.token}" - ${(prob * 100).toFixed(1)}%${isSelected ? ' ★' : ''}<br>`;
-                    });
+                try {
+                    let html = `<strong>Token:</strong> "${tokenInfo.token || 'N/A'}"<br>`;
+                    html += `<strong>Probability:</strong> ${(tokenInfo.probability * 100).toFixed(2)}% (log: ${tokenInfo.logprob.toFixed(3)})<br>`;
+                    html += `<strong>Entropy:</strong> ${tokenInfo.entropy.toFixed(2)} bits<br>`;
+                    html += `<strong>Surprisal:</strong> ${tokenInfo.surprisal.toFixed(2)} bits<br>`;
+                    html += `<strong>Uncertainty:</strong> ${tokenInfo.uncertainty}<br><br>`;
+                    
+                    if (tokenInfo.alternatives && tokenInfo.alternatives.length > 1) {
+                        html += `<strong>Top ${Math.min(5, tokenInfo.alternatives.length)} alternatives:</strong><br>`;
+                        tokenInfo.alternatives.slice(0, 5).forEach((alt, index) => {
+                            const prob = Math.exp(alt.logprob);
+                            const isSelected = alt.token === tokenInfo.token;
+                            const tokenDisplay = (alt.token || '').substring(0, 20);
+                            html += `${index + 1}. "${tokenDisplay}" - ${(prob * 100).toFixed(1)}%${isSelected ? ' ★' : ''}<br>`;
+                        });
+                    }
+                    
+                    return html;
+                } catch (error) {
+                    return `<span style="color: var(--error);">Error formatting details: ${error.message}</span>`;
                 }
-                
-                return html;
             }
 
             updateTokenSequence() {
-                const tokenStream = document.getElementById('tokenStream');
-                tokenStream.innerHTML = '';
-                
-                this.tokenData.slice(-20).forEach((tokenData, index) => {
-                    const tokenEl = document.createElement('span');
-                    tokenEl.className = `token ${tokenData.uncertainty}-uncertainty`;
-                    tokenEl.textContent = tokenData.token;
+                try {
+                    const tokenStream = document.getElementById('tokenStream');
+                    if (!tokenStream) return;
                     
-                    if (index === this.tokenData.length - 1) {
-                        tokenEl.classList.add('current');
-                    }
+                    tokenStream.innerHTML = '';
                     
-                    tokenEl.addEventListener('click', () => {
-                        this.showTokenDetails(tokenData);
+                    // Show last 20 tokens to avoid performance issues
+                    const recentTokens = this.tokenData.slice(-20);
+                    const currentIndex = this.tokenData.length - 1;
+                    
+                    recentTokens.forEach((tokenData, index) => {
+                        const tokenEl = document.createElement('span');
+                        tokenEl.className = `token ${tokenData.uncertainty}-uncertainty`;
+                        tokenEl.textContent = (tokenData.token || '').substring(0, 10);
+                        
+                        const actualIndex = this.tokenData.length - recentTokens.length + index;
+                        if (actualIndex === currentIndex) {
+                            tokenEl.classList.add('current');
+                        }
+                        
+                        tokenEl.addEventListener('click', () => {
+                            this.showTokenDetails(tokenData);
+                        });
+                        
+                        tokenStream.appendChild(tokenEl);
                     });
-                    
-                    tokenStream.appendChild(tokenEl);
-                });
+                } catch (error) {
+                    console.error('Error updating token sequence:', error);
+                    this.logger.log(`Token sequence update error: ${error.message}`, 'error');
+                }
             }
 
             showTokenDetails(tokenData) {
-                const alternativeTokens = document.getElementById('alternativeTokens');
-                alternativeTokens.innerHTML = '<div style="font-size: 11px; margin-bottom: 6px; color: var(--text-secondary);">Token Details</div>';
-                
-                if (tokenData.alternatives && tokenData.alternatives.length > 0) {
-                    tokenData.alternatives.forEach(alt => {
-                        const altEl = document.createElement('div');
-                        altEl.className = 'alternative-token';
-                        altEl.innerHTML = `
-                            <span class="alternative-token-text">"${alt.token}"</span>
-                            <span class="alternative-token-prob">${(Math.exp(alt.logprob) * 100).toFixed(1)}%</span>
-                        `;
-                        alternativeTokens.appendChild(altEl);
-                    });
+                try {
+                    const alternativeTokens = document.getElementById('alternativeTokens');
+                    if (!alternativeTokens) return;
+                    
+                    alternativeTokens.innerHTML = '<div style="font-size: 11px; margin-bottom: 6px; color: var(--text-secondary);">Token Details</div>';
+                    
+                    if (tokenData.alternatives && tokenData.alternatives.length > 0) {
+                        tokenData.alternatives.forEach(alt => {
+                            const prob = Math.exp(alt.logprob);
+                            if (!isFinite(prob)) return;
+                            
+                            const altEl = document.createElement('div');
+                            altEl.className = 'alternative-token';
+                            altEl.innerHTML = `
+                                <span class="alternative-token-text">"${(alt.token || '').substring(0, 30)}"</span>
+                                <span class="alternative-token-prob">${(prob * 100).toFixed(1)}%</span>
+                            `;
+                            alternativeTokens.appendChild(altEl);
+                        });
+                    }
+                    
+                    // Switch to sequence tab
+                    this.switchTab('sequence');
+                } catch (error) {
+                    console.error('Error showing token details:', error);
+                    this.logger.log(`Token details error: ${error.message}`, 'error');
                 }
-                
-                // Switch to sequence tab
-                this.switchTab('sequence');
             }
 
             finalizeAnalysis() {
-                // Calculate final statistics
-                if (this.tokenData.length >= 10) {
-                    const entropies = this.tokenData.map(t => t.entropy);
-                    const stats = StatisticalAnalysis.calculateStatistics(entropies);
-                    
-                    const statsHtml = `
-                        <div style="font-size: 11px; line-height: 1.5;">
-                            <strong>Entropy Statistics (n=${this.tokenData.length})</strong><br>
-                            Mean: ${stats.mean.toFixed(2)} ± ${stats.std.toFixed(2)}<br>
-                            Median: ${stats.median.toFixed(2)}<br>
-                            Range: ${stats.min.toFixed(2)} - ${stats.max.toFixed(2)}<br>
-                            IQR: ${stats.q25.toFixed(2)} - ${stats.q75.toFixed(2)}<br><br>
+                try {
+                    // Calculate final statistics if we have enough data
+                    if (this.tokenData.length >= 5) {
+                        const entropies = this.tokenData
+                            .map(t => t.entropy)
+                            .filter(e => typeof e === 'number' && isFinite(e));
+                        
+                        const stats = StatisticalAnalysis.calculateStatistics(entropies);
+                        
+                        if (stats) {
+                            const uncertaintyDistribution = {
+                                high: this.tokenData.filter(t => t.uncertainty === 'high').length,
+                                medium: this.tokenData.filter(t => t.uncertainty === 'medium').length,
+                                low: this.tokenData.filter(t => t.uncertainty === 'low').length
+                            };
                             
-                            <strong>Uncertainty Distribution</strong><br>
-                            High: ${this.tokenData.filter(t => t.uncertainty === 'high').length} tokens<br>
-                            Medium: ${this.tokenData.filter(t => t.uncertainty === 'medium').length} tokens<br>
-                            Low: ${this.tokenData.filter(t => t.uncertainty === 'low').length} tokens
-                        </div>
-                    `;
+                            const statsHtml = `
+                                <div style="font-size: 11px; line-height: 1.5;">
+                                    <strong>Entropy Statistics (n=${stats.count})</strong><br>
+                                    Mean: ${stats.mean.toFixed(2)} ± ${stats.std.toFixed(2)}<br>
+                                    Median: ${stats.median.toFixed(2)}<br>
+                                    Range: ${stats.min.toFixed(2)} - ${stats.max.toFixed(2)}<br>
+                                    IQR: ${stats.q25.toFixed(2)} - ${stats.q75.toFixed(2)}<br><br>
+                                    
+                                    <strong>Uncertainty Distribution</strong><br>
+                                    High: ${uncertaintyDistribution.high} tokens (${(uncertaintyDistribution.high / this.tokenData.length * 100).toFixed(1)}%)<br>
+                                    Medium: ${uncertaintyDistribution.medium} tokens (${(uncertaintyDistribution.medium / this.tokenData.length * 100).toFixed(1)}%)<br>
+                                    Low: ${uncertaintyDistribution.low} tokens (${(uncertaintyDistribution.low / this.tokenData.length * 100).toFixed(1)}%)
+                                </div>
+                            `;
+                            
+                            const statsElement = document.getElementById('statsResults');
+                            if (statsElement) {
+                                statsElement.innerHTML = statsHtml;
+                            }
+                        }
+                    }
                     
-                    document.getElementById('statsResults').innerHTML = statsHtml;
+                    this.logger.log('Analysis finalized successfully', 'success');
+                    
+                } catch (error) {
+                    console.error('Error finalizing analysis:', error);
+                    this.logger.log(`Analysis finalization error: ${error.message}`, 'error');
                 }
             }
 
             calculateAverageUncertainty() {
                 if (this.tokenData.length === 0) return '-';
-                const avgEntropy = this.tokenData.reduce((sum, t) => sum + t.entropy, 0) / this.tokenData.length;
-                return StatisticalAnalysis.classifyUncertainty(avgEntropy);
+                
+                try {
+                    const validEntropies = this.tokenData
+                        .map(t => t.entropy)
+                        .filter(e => typeof e === 'number' && isFinite(e));
+                    
+                    if (validEntropies.length === 0) return '-';
+                    
+                    const avgEntropy = validEntropies.reduce((sum, e) => sum + e, 0) / validEntropies.length;
+                    return StatisticalAnalysis.classifyUncertainty(avgEntropy);
+                } catch (error) {
+                    return '-';
+                }
             }
 
             stopGeneration() {
+                if (this.isGenerating && this.abortController) {
+                    this.abortController.abort();
+                    this.logger.log('Generation stop requested', 'warning');
+                }
                 this.isGenerating = false;
+            }
+
+            updateGenerationProgress(current, max) {
+                const progressElement = document.getElementById('generateProgress');
+                if (progressElement) {
+                    const percent = Math.min(100, (current / max) * 100);
+                    progressElement.style.width = `${percent}%`;
+                }
+            }
+
+            updateGenerationUI() {
+                const generateBtn = document.getElementById('generateBtn');
+                const stopBtn = document.getElementById('stopBtn');
+                const progressElement = document.getElementById('generateProgress');
+                
+                if (generateBtn) {
+                    generateBtn.disabled = this.isGenerating || !this.currentModel;
+                    generateBtn.querySelector('span').textContent = this.isGenerating ? 'Generating...' : 'Generate & Analyze';
+                }
+                
+                if (stopBtn) {
+                    stopBtn.disabled = !this.isGenerating;
+                }
+                
+                if (progressElement) {
+                    progressElement.style.width = this.isGenerating ? '0%' : '0%';
+                }
             }
 
             switchTab(tabName) {
@@ -1463,36 +2080,49 @@
 
             exportData(format) {
                 if (this.tokenData.length === 0) {
-                    alert('No data to export. Generate some tokens first.');
+                    ErrorHandler.showError('No data to export. Generate some tokens first.');
                     return;
                 }
 
-                const exportData = {
-                    metadata: {
-                        experimentId: this.experimentId,
-                        timestamp: new Date().toISOString(),
-                        model: this.currentModel,
-                        prompt: document.getElementById('promptInput').value,
-                        parameters: {
-                            temperature: parseFloat(document.getElementById('tempSlider').value),
-                            maxTokens: parseInt(document.getElementById('maxTokens').value),
-                            topK: parseInt(document.getElementById('topKValue').textContent)
+                try {
+                    const exportData = {
+                        metadata: {
+                            experimentId: this.experimentId,
+                            timestamp: new Date().toISOString(),
+                            model: this.currentModel || 'Unknown',
+                            prompt: document.getElementById('promptInput').value,
+                            parameters: {
+                                temperature: parseFloat(document.getElementById('tempSlider').value),
+                                maxTokens: parseInt(document.getElementById('maxTokens').value),
+                                topK: parseInt(document.getElementById('topKValue').textContent)
+                            },
+                            webllmVersion: "0.2.x",
+                            toolVersion: "2.0.0",
+                            generationErrors: this.generationErrors
                         },
-                        webllmVersion: "0.2.x",
-                        toolVersion: "1.0.0"
-                    },
-                    tokens: this.tokenData,
-                    statistics: this.tokenData.length >= 10 ? 
-                        StatisticalAnalysis.calculateStatistics(this.tokenData.map(t => t.entropy)) : null
-                };
+                        tokens: this.tokenData,
+                        statistics: this.tokenData.length >= 5 ? 
+                            StatisticalAnalysis.calculateStatistics(this.tokenData.map(t => t.entropy)) : null
+                    };
 
-                if (format === 'json') {
-                    this.downloadJSON(exportData, `llm-research-${this.experimentId}.json`);
-                } else {
-                    this.downloadCSV(exportData, `llm-research-${this.experimentId}.csv`);
+                    if (format === 'json') {
+                        this.downloadJSON(exportData, `llm-analysis-${this.experimentId}.json`);
+                    } else {
+                        this.downloadCSV(exportData, `llm-analysis-${this.experimentId}.csv`);
+                    }
+
+                    const lastExportElement = document.getElementById('lastExport');
+                    if (lastExportElement) {
+                        lastExportElement.textContent = `Last export: ${new Date().toLocaleTimeString()}`;
+                    }
+                    
+                    this.logger.log(`Data exported as ${format.toUpperCase()}`, 'success');
+
+                } catch (error) {
+                    const errorInfo = ErrorHandler.logError('Export', error);
+                    ErrorHandler.showError(`Export failed: ${error.message}`);
+                    this.logger.log(`Export failed: ${error.message}`, 'error');
                 }
-
-                document.getElementById('lastExport').textContent = `Last export: ${new Date().toLocaleTimeString()}`;
             }
 
             downloadJSON(data, filename) {
@@ -1503,14 +2133,14 @@
             downloadCSV(data, filename) {
                 const headers = ['position', 'token', 'probability', 'logprob', 'entropy', 'surprisal', 'perplexity', 'uncertainty'];
                 const rows = data.tokens.map(token => [
-                    token.position,
-                    `"${token.token.replace(/"/g, '""')}"`,
-                    token.probability,
-                    token.logprob,
-                    token.entropy,
-                    token.surprisal,
-                    token.perplexity,
-                    token.uncertainty
+                    token.position || 0,
+                    `"${(token.token || '').replace(/"/g, '""')}"`,
+                    token.probability || 0,
+                    token.logprob || 0,
+                    token.entropy || 0,
+                    token.surprisal || 0,
+                    token.perplexity || 0,
+                    token.uncertainty || 'unknown'
                 ]);
                 
                 const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
@@ -1527,41 +2157,54 @@
                 URL.revokeObjectURL(url);
             }
 
-            updateGenerationUI() {
-                document.getElementById('generateBtn').disabled = this.isGenerating || !this.currentModel;
-                document.getElementById('stopBtn').disabled = !this.isGenerating;
-                
-                if (this.isGenerating) {
-                    document.getElementById('generateBtn').textContent = 'Generating...';
-                } else {
-                    document.getElementById('generateBtn').textContent = 'Generate & Analyze';
-                }
-            }
-
-            updateModelStatus(status) {
-                document.getElementById('modelStatus').textContent = status;
-                
+            updateModelStatus(status, type = 'info') {
+                const statusElement = document.getElementById('modelStatus');
                 const indicator = document.getElementById('statusIndicator');
-                if (status.includes('Loading') || status.includes('Initializing')) {
-                    indicator.className = 'status-indicator loading';
-                } else if (status.includes('ready') || status.includes('loaded')) {
-                    indicator.className = 'status-indicator ready';
-                } else {
+                
+                if (statusElement) {
+                    statusElement.textContent = status;
+                }
+                
+                if (indicator) {
                     indicator.className = 'status-indicator';
+                    
+                    if (status.includes('Loading') || status.includes('Initializing')) {
+                        indicator.classList.add('loading');
+                    } else if (status.includes('ready') || status.includes('loaded')) {
+                        indicator.classList.add('ready');
+                    } else if (type === 'error' || status.includes('failed')) {
+                        indicator.classList.add('error');
+                    }
                 }
             }
 
             updateLoadingText(text, details = '') {
-                document.getElementById('loadingText').textContent = text;
-                document.getElementById('loadingDetails').textContent = details;
+                const textElement = document.getElementById('loadingText');
+                const detailsElement = document.getElementById('loadingDetails');
+                
+                if (textElement) textElement.textContent = text;
+                if (detailsElement) detailsElement.textContent = details;
+            }
+
+            updateLoadingProgress(percent) {
+                const progressBar = document.getElementById('loadingProgressBar');
+                if (progressBar) {
+                    progressBar.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+                }
             }
 
             showLoadingScreen() {
-                document.getElementById('loadingScreen').style.display = 'flex';
+                const loadingScreen = document.getElementById('loadingScreen');
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'flex';
+                }
             }
 
             hideLoadingScreen() {
-                document.getElementById('loadingScreen').style.display = 'none';
+                const loadingScreen = document.getElementById('loadingScreen');
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'none';
+                }
             }
 
             updateUI() {
@@ -1569,11 +2212,45 @@
                 document.getElementById('generateBtn').disabled = true;
                 document.getElementById('stopBtn').disabled = true;
             }
+
+            cleanup() {
+                try {
+                    if (this.abortController) {
+                        this.abortController.abort();
+                    }
+                    
+                    if (this.visualizer) {
+                        this.visualizer.destroy();
+                    }
+                    
+                    this.isGenerating = false;
+                    this.isLoading = false;
+                    
+                } catch (error) {
+                    console.error('Cleanup error:', error);
+                }
+            }
         }
 
-        // Initialize application
+        // Initialize application with error boundary
         document.addEventListener('DOMContentLoaded', () => {
-            new LLMResearchInterface();
+            try {
+                new RobustLLMAnalyzer();
+            } catch (error) {
+                console.error('Failed to initialize application:', error);
+                ErrorHandler.showError('Application failed to start', error.message);
+            }
+        });
+
+        // Global error handler
+        window.addEventListener('error', (event) => {
+            console.error('Global error:', event.error);
+            ErrorHandler.showError('An unexpected error occurred', event.error.message);
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            console.error('Unhandled promise rejection:', event.reason);
+            ErrorHandler.showError('An unexpected error occurred', event.reason.message || event.reason);
         });
     </script>
 </body>
